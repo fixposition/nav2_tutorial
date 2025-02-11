@@ -5,8 +5,8 @@
 
     <xacro:arg name="robot_namespace" default="/" /> 
 
-    <xacro:include filename="$(find agilex_demo)/urdf/scout_wheel_type1.xacro" />
-    <xacro:include filename="$(find agilex_demo)/urdf/scout_wheel_type2.xacro" />
+    <xacro:include filename="$(find nav2_tutorial)/urdf/scout_wheel_type1.xacro" />
+    <xacro:include filename="$(find nav2_tutorial)/urdf/scout_wheel_type2.xacro" />
 
     <!-- Variables -->
     <xacro:property name="M_PI" value="3.14159"/>
@@ -28,7 +28,7 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <mesh filename="package://agilex_demo/meshes/scout_v2/base_link.dae" />
+                <mesh filename="package://nav2_tutorial/meshes/scout_v2/base_link.dae" />
             </geometry>
         </visual>
         <collision>

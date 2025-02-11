@@ -3,7 +3,7 @@
 <robot name="scout_vrtk" 
     xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:include filename="$(find agilex_demo)/urdf/scout_v2.xacro" />
+    <xacro:include filename="$(find nav2_tutorial)/urdf/scout_v2.xacro" />
 
     <!-- For testing, hang the robot up in the air -->
     <!-- <link name="world" />

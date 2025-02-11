@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>agilex_demo</name>
+  <name>nav2_tutorial</name>
   <version>0.0.0</version>
   <description>GPS Waypoints Follower for AgileX Scout Mini</description>
   <maintainer email="facundo.garcia@fixposition.com">Facundo Garcia</maintainer>

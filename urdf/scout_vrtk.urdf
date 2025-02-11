@@ -9,7 +9,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://agilex_demo/meshes/scout_v2/base_link.dae"/>
+        <mesh filename="package://nav2_tutorial/meshes/scout_v2/base_link.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -52,7 +52,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://agilex_demo/meshes/scout_v2/wheel_type1.dae"/>
+        <mesh filename="package://nav2_tutorial/meshes/scout_v2/wheel_type1.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -77,7 +77,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://agilex_demo/meshes/scout_v2/wheel_type2.dae"/>
+        <mesh filename="package://nav2_tutorial/meshes/scout_v2/wheel_type2.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -102,7 +102,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://agilex_demo/meshes/scout_v2/wheel_type1.dae"/>
+        <mesh filename="package://nav2_tutorial/meshes/scout_v2/wheel_type1.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -127,7 +127,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://agilex_demo/meshes/scout_v2/wheel_type2.dae"/>
+        <mesh filename="package://nav2_tutorial/meshes/scout_v2/wheel_type2.dae"/>
       </geometry>
     </visual>
     <collision>

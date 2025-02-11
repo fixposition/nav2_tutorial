@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    gps_wpf_dir = get_package_share_directory("agilex_demo")
+    gps_wpf_dir = get_package_share_directory("nav2_tutorial")
     rl_params_file = os.path.join(gps_wpf_dir, "config", "dual_ekf_navsat_params.yaml")
 
     return LaunchDescription(

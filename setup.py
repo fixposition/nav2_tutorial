@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = 'agilex_demo'
+package_name = 'nav2_tutorial'
 
 setup(
     name=package_name,
@@ -26,9 +26,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'logged_waypoint_follower = agilex_demo.logged_waypoint_follower:main',
-            'interactive_waypoint_follower = agilex_demo.interactive_waypoint_follower:main',
-            'gps_waypoint_logger = agilex_demo.gps_waypoint_logger:main'
+            'logged_waypoint_follower = nav2_tutorial.logged_waypoint_follower:main',
+            'interactive_waypoint_follower = nav2_tutorial.interactive_waypoint_follower:main',
+            'gps_waypoint_logger = nav2_tutorial.gps_waypoint_logger:main'
         ],
     },
 )

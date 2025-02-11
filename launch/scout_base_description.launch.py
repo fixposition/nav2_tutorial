@@ -13,7 +13,7 @@ def generate_launch_description():
     # print(model_path)
     robot_description = Command([
         PathJoinSubstitution([FindExecutable(name="xacro")]), " ",
-        PathJoinSubstitution([FindPackageShare("agilex_demo"), "urdf", model_name]),
+        PathJoinSubstitution([FindPackageShare("nav2_tutorial"), "urdf", model_name]),
     ])
 
     # Launch robot state publisher
