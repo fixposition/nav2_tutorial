@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+
+<robot name="scout_vrtk" 
+    xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:include filename="$(find agilex_demo)/urdf/scout_v2.xacro" />
+
+    <!-- For testing, hang the robot up in the air -->
+    <!-- <link name="world" />
+    <joint name="world_to_base_link=" type="fixed">
+        <origin xyz="0 0 0.5" rpy="0 0 0" />
+        <parent link="world"/>
+        <child link="base_link"/>
+    </joint> -->
+
+    <link name="imu_link">
+        <visual>
+            <origin xyz="0.0 0.0 0.0" />
+            <geometry>
+                <cylinder length="0.03" radius="0.02" />
+            </geometry>
+            <material name="red" />
+        </visual>
+    </link>
+
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="imu_link" />
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+    </joint>
+
+    <link name="gps_link">
+        <visual>
+            <origin xyz="0.0 0.0 0.0" />
+            <geometry>
+                <cylinder length="0.03" radius="0.02" />
+            </geometry>
+            <material name="red" />
+        </visual>
+    </link>
+
+    <joint name="base_gps_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="gps_link" />
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+    </joint>
+    
+</robot>
