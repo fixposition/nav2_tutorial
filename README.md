@@ -7,7 +7,7 @@
 ## ROS Packages
 1. Scout Driver (scout_ros2, ugv_sdk)
 2. Fixposition Vision-RTK2 Driver (fixposition_driver)
-3. AgileX Nav2 Demo (agilex_demo)
+3. AgileX Nav2 Demo (nav2_tutorial)
 
 # Setup Tutorial
 ### Step 1: Build ROS Packages Above
@@ -35,7 +35,7 @@ cd ..
 git clone https://github.com/fixposition/fixposition_driver.git
 
 # AgileX Nav2 Demo
-git clone git@gitlab.internal.fixposition.com:chenguang.gao/agilex_demo.git
+git clone https://github.com/fixposition/nav2_tutorial.git
 
 # Build these ros packages
 cd ~/ros2_humble_ws
@@ -96,14 +96,14 @@ Then, launch nodes in the following order.
 ```
 ros2 launch scout_base scout_mini_base.launch.py
 ros2 launch fixposition_driver_ros2 tcp.launch
-ros2 launch agilex_demo gps_waypoint_follower.launch.py use_mapviz:=True
+ros2 launch nav2_tutorial gps_waypoint_follower.launch.py use_mapviz:=True
 ```
 
 Finally, start navigation. There are two types waypoint following methods. We can only choose one method each time we execute it.
 
 * Interactive GPS Waypoint Follower
 ```
-ros2 run agilex_demo interactive_waypoint_follower
+ros2 run nav2_tutorial interactive_waypoint_follower
 ```
 
 
@@ -111,10 +111,10 @@ ros2 run agilex_demo interactive_waypoint_follower
 
 First, we must get a predefined gps_waypoints.yaml file that we want the robot to follow. One method is that we give GPS points manually. Another is that we can use waypoint logging tool to get this file just like below.
 ```
-ros2 run agilex_demo gps_waypoint_logger
+ros2 run nav2_tutorial gps_waypoint_logger
 ```
 
 Second, We can use logged_waypoint_follower to make the robot follow the logged waypoints.
 ```
-ros2 run agilex_demo logged_waypoint_follower ~/gps_waypoints.yaml
+ros2 run nav2_tutorial logged_waypoint_follower ~/gps_waypoints.yaml
 ```
