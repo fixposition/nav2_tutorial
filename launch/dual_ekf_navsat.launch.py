@@ -34,19 +34,5 @@ def generate_launch_description():
                 parameters=[rl_params_file, {"use_sim_time": False}],
                 remappings=[("odometry/filtered", "odometry/global")],
             ),
-            Node(
-                package="robot_localization",
-                executable="navsat_transform_node",
-                name="navsat_transform",
-                output="screen",
-                parameters=[rl_params_file, {"use_sim_time": False}],
-                remappings=[
-                    ("imu/data", "/fixposition/poiimu"),
-                    ("gps/fix", "fixposition/odometry_llh"),
-                    ("gps/filtered", "gps/filtered"),
-                    ("odometry/gps", "odometry/gps"),
-                    ("odometry/filtered", "odometry/global"),
-                ],
-            )
         ]
     )
