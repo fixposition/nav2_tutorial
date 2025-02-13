@@ -26,9 +26,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'logged_waypoint_follower = nav2_tutorial.logged_waypoint_follower:main',
-            'interactive_waypoint_follower = nav2_tutorial.interactive_waypoint_follower:main',
-            'gps_waypoint_logger = nav2_tutorial.gps_waypoint_logger:main'
+            'logged_waypoint_follower = src.logged_waypoint_follower:main',
+            'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
+            'gps_waypoint_logger = src.gps_waypoint_logger:main'
         ],
     },
 )
