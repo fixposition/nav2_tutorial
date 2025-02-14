@@ -6,15 +6,15 @@ ekf_filter_node_odom:
     debug: false
 
     publish_tf: true
-    map_frame: FP_ENU0
+    map_frame: map
     odom_frame: odom
-    base_link_frame: FP_POI
+    base_link_frame: base_link
     world_frame: odom
 
-    odom0: /fixposition/odometry_enu_smooth
+    odom0: /fixposition/odometry_enu
     odom0_config: [true,  true,  true,
                    true,  true,  true,
-                   false, false, false,
+                   true,  true,  true,
                    false, false, false,
                    false, false, false]
     odom0_queue_size: 10
@@ -47,10 +47,10 @@ ekf_filter_node_map:
     debug: false
     publish_tf: true
 
-    map_frame: FP_ENU0
+    map_frame: map
     odom_frame: odom
-    base_link_frame: FP_POI
-    world_frame: FP_ENU0
+    base_link_frame: base_link
+    world_frame: map
 
     odom0: /fixposition/odometry_enu
     odom0_config: [true,  true,  true,

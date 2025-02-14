@@ -28,20 +28,20 @@ def generate_launch_description():
         ),
         
         # Set up static transform between map and origin
-        # Node(
-        #     package='tf2_ros',
-        #     executable='static_transform_publisher',
-        #     name='swri_transform',
-        #     output='screen',
-        #     arguments=[
-        #         '--x', '0',
-        #         '--y', '0',
-        #         '--z', '0',
-        #         '--yaw', '0',
-        #         '--pitch', '0',
-        #         '--roll', '0',
-        #         '--frame-id', 'map',
-        #         '--child-frame-id', 'origin'
-        #     ]
-        # )
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='swri_transform',
+            output='screen',
+            arguments=[
+                '--x', '0',
+                '--y', '0',
+                '--z', '0',
+                '--yaw', '0',
+                '--pitch', '0',
+                '--roll', '0',
+                '--frame-id', 'map',
+                '--child-frame-id', 'origin'
+            ]
+        )
     ])
