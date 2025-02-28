@@ -10,6 +10,7 @@ mapviz_config_file = os.path.join(gps_wpf_dir, "config", "gps_wpf_demo.mvc")
 
 def generate_launch_description():
     return LaunchDescription([
+        # Spawn mapviz node
         Node(
             package="mapviz",
             executable="mapviz",
@@ -22,9 +23,7 @@ def generate_launch_description():
             package="swri_transform_util",
             executable="initialize_origin.py",
             name="initialize_origin",
-            remappings=[
-                ("fix", "fixposition/odometry_llh"),
-            ],
+            remappings=[("fix", "fixposition/odometry_llh")],
         ),
         
         # Set up static transform between map and origin

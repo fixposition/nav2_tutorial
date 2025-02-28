@@ -10,6 +10,7 @@ def generate_launch_description():
                                   "config", "dual_ekf_navsat_params.yaml")
 
     return LaunchDescription([
+        # Spawn EKF node for local odometry
         Node(
             package="robot_localization",
             executable="ekf_node",
@@ -18,6 +19,8 @@ def generate_launch_description():
             parameters=[rl_params_file, {"use_sim_time": False}],
             remappings=[("odometry/filtered", "odometry/local")],
         ),
+        
+        # Spawn EKF node for global odometry
         Node(
             package="robot_localization",
             executable="ekf_node",
@@ -26,6 +29,8 @@ def generate_launch_description():
             parameters=[rl_params_file, {"use_sim_time": False}],
             remappings=[("odometry/filtered", "odometry/global")],
         ),
+        
+        # Spawn Navsat transformation node
         Node(
             package="robot_localization",
             executable="navsat_transform_node",
@@ -33,11 +38,11 @@ def generate_launch_description():
             output="screen",
             parameters=[rl_params_file, {"use_sim_time": False}],
             remappings=[
-                ("imu/data", "/fixposition/poiimu"),
-                ("gps/fix", "fixposition/odometry_llh"),
-                ("gps/filtered", "gps/filtered"),
-                ("odometry/gps", "odometry/gps"),
-                ("odometry/filtered", "odometry/global"),
+                ("imu/data", "/fixposition/poiimu"),      # (Input) Message with orientation data
+                ("odometry/filtered", "odometry/global"), # (Input) Robot's current position
+                ("gps/fix", "fixposition/odometry_llh"),  # (Input) Robot's GPS coordinates
+                ("odometry/gps", "odometry/gps"),         # (Output) Robot's GPS coordinates, transformed into its world frame
+                ("gps/filtered", "gps/filtered"),         # (Output) Robot’s world frame position, transformed into GPS coordinates
             ],
-        )
+        ),
     ])
