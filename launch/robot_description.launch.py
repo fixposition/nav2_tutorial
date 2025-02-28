@@ -34,11 +34,11 @@ def generate_launch_description():
             }]
         ),
         
-        # Launch static transform publisher from FP_POI to base_link
+        # Launch static transform publisher from FP_POI to vrtk_link
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            name='static_tf_base_to_fp_poi',
+            name='static_tf_vrtk_to_fp_poi',
             output='screen',
             arguments=[
                 '--x', '0',
@@ -48,7 +48,7 @@ def generate_launch_description():
                 '--pitch', '0',
                 '--roll', '0',
                 '--frame-id', 'FP_POI',
-                '--child-frame-id', 'base_link'
+                '--child-frame-id', 'vrtk_link'
             ]
         )
     ])
