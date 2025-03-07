@@ -23,7 +23,7 @@ def generate_launch_description():
             package="swri_transform_util",
             executable="initialize_origin.py",
             name="initialize_origin",
-            remappings=[("fix", "fixposition/odometry_llh")],
+            remappings=[("fix", "fixposition/datum")],
         ),
         
         # Set up static transform between map and origin

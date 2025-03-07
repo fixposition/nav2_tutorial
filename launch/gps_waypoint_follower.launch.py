@@ -5,8 +5,9 @@ from nav2_common.launch import RewrittenYaml
 from launch import LaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -76,5 +77,19 @@ def generate_launch_description():
     ld.add_action(navigation2_cmd)
     ld.add_action(rviz_cmd)
     ld.add_action(mapviz_cmd)
+    
+    # Add the set_datum node
+    datum_node = TimerAction(
+        period=5.0,
+        actions=[
+            Node(
+                package="nav2_tutorial",
+                executable="set_datum",
+                name="set_datum",
+                output="screen"
+            )
+        ]
+    )
+    ld.add_action(datum_node)
 
     return ld

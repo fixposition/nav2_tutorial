@@ -27,7 +27,8 @@ setup(
         'console_scripts': [
             'logged_waypoint_follower = src.logged_waypoint_follower:main',
             'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
-            'gps_waypoint_logger = src.gps_waypoint_logger:main'
+            'gps_waypoint_logger = src.gps_waypoint_logger:main',
+            'set_datum = src.set_datum:main'
         ],
     },
 )

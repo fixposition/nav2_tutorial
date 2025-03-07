@@ -16,9 +16,9 @@
         </visual>
     </link>
 
-    <joint name="base_vrtk_joint" type="fixed">
-        <parent link="base_link"/>
-        <child link="vrtk_link"/>
+    <joint name="vrtk_base_joint" type="fixed">
+        <parent link="vrtk_link"/>
+        <child link="base_link"/>
         <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
     </joint>
 </robot>
