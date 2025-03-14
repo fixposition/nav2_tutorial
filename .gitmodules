@@ -1,0 +1,10 @@
+[submodule "src/fixposition_driver"]
+	path = src/fixposition_driver
+	url = https://github.com/fixposition/fixposition_driver.git
+[submodule "src/ugv_sdk"]
+	path = src/ugv_sdk
+	url = https://github.com/westonrobot/ugv_sdk.git
+[submodule "src/scout_ros2"]
+	path = src/scout_ros2
+	url = https://github.com/fgarciacardenas/scout_ros2.git
+	branch = vrtk-fix

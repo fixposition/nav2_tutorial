@@ -1,0 +1,4 @@
+# Ignore catkin outputs
+log/
+build/
+install/

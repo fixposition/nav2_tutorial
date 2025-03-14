@@ -1,8 +1,8 @@
-# AgileX Scout Mini GPS Waypoint Follower Setup
+# Fixposition VRTK2 Nav2 Tutorial: Waypoint Follower
 
 ## Environment
-1. Ubuntu 22.04 LTS
-2. ROS Version: ROS2 Humble
+1. Ubuntu 20.04 LTS
+2. ROS Version: ROS2 Iron
 
 ## ROS Packages
 1. Scout Driver (scout_ros2, ugv_sdk)
