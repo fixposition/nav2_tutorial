@@ -101,7 +101,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 Launch the ROS nodes in the following order:
 ```
 ros2 launch scout_base scout_mini_base.launch.py
-ros2 launch fixposition_driver_ros2 tcp.launch
+ros2 launch fixposition_driver_ros2 node.launch
 ros2 launch nav2_tutorial gps_waypoint_follower.launch.py use_mapviz:=True
 ```
 
