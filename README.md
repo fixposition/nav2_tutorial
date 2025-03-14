@@ -8,9 +8,17 @@
 2. ROS Version: ROS2 Iron
 
 ### ROS Packages
+The following ROS packages are required for this project:
+
 1. Scout Driver ([scout_ros2](https://github.com/westonrobot/scout_ros2.git), [ugv_sdk](https://github.com/westonrobot/ugv_sdk.git))
 2. Fixposition Vision-RTK2 Driver ([fixposition_driver](https://github.com/fixposition/fixposition_driver.git))
 3. Fixposition Nav2 Tutorial ([nav2_tutorial](https://github.com/fixposition/nav2_tutorial.git))
+
+To obtain them, simply execute the following command at the root of the repository:
+```
+git submodule update --init --recursive
+```
+
 
 ### (Optional) Docker container
 - The user can also compile the provided Docker container in the .devcontainer folder to test this tutorial.
