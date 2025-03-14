@@ -1,56 +1,69 @@
 # Fixposition VRTK2 Nav2 Tutorial: Waypoint Follower
 
-## Environment
+# Setup Tutorial
+
+## Step 1: Set up workspace
+### Environment
 1. Ubuntu 20.04 LTS
 2. ROS Version: ROS2 Iron
 
-## ROS Packages
-1. Scout Driver (scout_ros2, ugv_sdk)
-2. Fixposition Vision-RTK2 Driver (fixposition_driver)
-3. AgileX Nav2 Demo (nav2_tutorial)
+### ROS Packages
+1. Scout Driver ([scout_ros2](https://github.com/westonrobot/scout_ros2.git), [ugv_sdk](https://github.com/westonrobot/ugv_sdk.git))
+2. Fixposition Vision-RTK2 Driver ([fixposition_driver](https://github.com/fixposition/fixposition_driver.git))
+3. Fixposition Nav2 Tutorial ([nav2_tutorial](https://github.com/fixposition/nav2_tutorial.git))
 
-# Setup Tutorial
-### Step 1: Build ROS Packages Above
-Create a ROS2 workspace.
+### (Optional) Docker container
+- The user can also compile the provided Docker container in the .devcontainer folder to test this tutorial.
+
+
+## Step 2: Set up Fixposition ROS Driver
+
+To use the ROS driver with the Scout robot, the following changes must be applied:
+
+1. Enable the following messages in the I/O configuration page of the sensor:
+    - FP_A-ODOMETRY
+    - FP_A-ODOMENU
+    - FP_A-ODOMSH
+    - FP_A-LLH
+    - FP_A-EOE_FUSION
+    - FP_A-TF_VRTKCAM	
+    - FP_A-TF_POIVRTK	
+    - FP_A-TF_ECEFENU0 	
+    - FP_A-TF_POIPOISH 	
+    - FP_A-TF_POIIMUH
+
+2. In the configuration file of the ROS driver (src/fixposition_driver/fixposition_driver_ros2/launch/config.yaml), change the 'nav2_mode' to 'true' and 'qos_type' to 'default_long'.
+
+3. Run the setup_ros_ws bash script to set up the fixposition driver accordingly.
+
+
+## Step 3: Build ROS2 workspace
+Build the ROS2 workspace.
 ```
-mkdir -p ~/ros2_humble_ws/src
-source /opt/ros/humble/setup.bash
-```
-
-Clone relevant ROS packages and make some changes.
-```
-cd ~/ros2_humble_ws/src
-
-# Scout Driver
-git clone https://github.com/westonrobot/ugv_sdk.git
-git clone https://github.com/westonrobot/scout_ros2.git
-cd scout_ros2
-git checkout humble
-
-sudo gedit ~/ros2_humble_ws/src/scout_ros2/scout_base/include/scout_base/scout_messenger.hpp
-## Comment out line 263 and save. (tf_broadcaster_->sendTransform(tf_msg);)
-cd ..
-
-# Fixposition Vision-RTK2 Driver
-git clone https://github.com/fixposition/fixposition_driver.git
-
-# AgileX Nav2 Demo
-git clone https://github.com/fixposition/nav2_tutorial.git
-
-# Build these ros packages
-cd ~/ros2_humble_ws
+source /opt/ros/iron/setup.bash
 colcon build
+```
+
+
+## Step 4: Source built packages
+```
 source install/setup.bash
 ```
 
-### Step 2: Test Scout Driver
-Use USB-to-CAN adapter to connect to AgileX first.
+
+## Step 5: Test Scout Driver
+
+### Establish connection with the Scout robot
+To communicate with the Scout robot, you must use the provided USB-to-CAN adapter. Then, run the following commands to start the connection:
 
 ```
 sudo modprobe gs_usb can-utils
 sudo ip link set can0 up type can bitrate 500000
 candump can0
-# You can see message from CAN0 like below.
+```
+
+Example output from the can0 port:
+```
 can0 311 [8] 00 00 25 C6 FF FF F0 A4
 can0 251 [8] 00 00 00 00 00 00 00 00
 can0 252 [8] 00 00 00 00 00 00 00 00
@@ -62,59 +75,43 @@ can0 311 [8] 00 00 25 C6 FF FF F0 A4
 ...
 ```
 
-Use keyboard to control AgileX Scout Mini.
+### Control the Scout robot using the keyboard
 
-Terminal 1:
+In terminal 1, run these commands to start the base node for the Scout robot:
 ```
-source /opt/ros/humble/setup.bash && source install/setup.bash
-# start the base node for the scout mini robot
+source /opt/ros/iron/setup.bash && source install/setup.bash
 ros2 launch scout_base scout_mini_base.launch.py
 ```
 
-Terminal 2:
+In terminal 2, run these commands to start the keyboard-based controller:
 ```
-source /opt/ros/humble/setup.bash
+source /opt/ros/iron/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-### Step 3: Test Fixposition Vision-RTK2 Driver
-Initialize Vision-RTK2 and make sure all converged.
-
-```
-# Need the following two output
-FP_A-ODOMETRY (/fixposition/ypr)
-FP_A-LLH (/fixposition/navsatfix)
-```
-
-### Step 4: Start GPS Waypoint Following
-First, make sure that the following things have been completed.
-1. Launch Scout Mini.
-2. Vision-RTK2 fusion works properly and all converge.
-3. Computer connects to AgileX Scout Mini.
-
-Then, launch nodes in the following order.
+## Step 6: Start GPS Waypoint Following
+Launch the ROS nodes in the following order:
 ```
 ros2 launch scout_base scout_mini_base.launch.py
 ros2 launch fixposition_driver_ros2 tcp.launch
 ros2 launch nav2_tutorial gps_waypoint_follower.launch.py use_mapviz:=True
 ```
 
-Finally, start navigation. There are two types waypoint following methods. We can only choose one method each time we execute it.
+Finally, start the navigation. There are two types waypoint following methods. We can only choose one method each time we execute it.
 
 * Interactive GPS Waypoint Follower
 ```
 ros2 run nav2_tutorial interactive_waypoint_follower
 ```
 
-
 * Logged GPS Waypoint Follower
 
-First, we must get a predefined gps_waypoints.yaml file that we want the robot to follow. One method is that we give GPS points manually. Another is that we can use waypoint logging tool to get this file just like below.
+First, the user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
 ```
 ros2 run nav2_tutorial gps_waypoint_logger
 ```
 
-Second, We can use logged_waypoint_follower to make the robot follow the logged waypoints.
+Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints.
 ```
 ros2 run nav2_tutorial logged_waypoint_follower ~/gps_waypoints.yaml
 ```
