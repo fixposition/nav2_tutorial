@@ -44,6 +44,17 @@ To use the ROS driver with the Scout robot, the following changes must be applie
 
 3. Run the setup_ros_ws bash script to set up the fixposition driver accordingly.
 
+4. (Optional) Configure wheelspeed measurements by setting up the following configuration:
+```YAML
+converter:
+    enabled: true
+    topic_type: "Odometry"     # Supported types: nav_msgs/{Twist, TwistWithCov, Odometry}
+    input_topic: "/odom"       # Input topic name
+    scale_factor: 1000.0       # To convert from the original unit of measurement to mm/s (note: this must be a float!)
+    use_x: true                # Transmit the x axis of the input velocity
+    use_y: false               # Transmit the y axis of the input velocity
+    use_z: false               # Transmit the z axis of the input velocity
+```
 
 ## Step 3: Build ROS2 workspace
 Build the ROS2 workspace.
