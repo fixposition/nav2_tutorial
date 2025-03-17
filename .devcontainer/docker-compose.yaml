@@ -7,7 +7,7 @@ services:
         USER_NAME: "${USER_NAME}"
         USER_ID: "${HOST_UID}"
         GROUP_ID: "${HOST_GID}"
-        BASE_IMAGE: "perception"
+        BASE_IMAGE: "ros:iron-perception"
     container_name: ros2_dev_container
     volumes:
       - ..:/home/dev/
