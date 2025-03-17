@@ -40,7 +40,8 @@ RUN <<EOF
         ros-iron-nav2-bringup \
         ros-iron-mapviz \
         ros-iron-mapviz-plugins \
-        ros-iron-tile-map
+        ros-iron-tile-map \ 
+        libasio-dev
 
     # Remove cached data
     rm -rf /var/lib/apt/lists/*
