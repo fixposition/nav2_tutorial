@@ -1,6 +1,6 @@
 # Dockerfile
 # Accept BASE_IMAGE as a build argument with a default value
-ARG BASE_IMAGE=osrf/ros:iron-desktop
+ARG BASE_IMAGE=ros:iron-ros-perception
 FROM ${BASE_IMAGE}
 
 # Set environment variable to prevent interactive prompts during package installation
