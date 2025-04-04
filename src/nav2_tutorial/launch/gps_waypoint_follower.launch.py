@@ -46,7 +46,7 @@ def generate_launch_description():
     )
 
     navigation2_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(launch_dir, "launch", "navigation_launch.py")),
+        PythonLaunchDescriptionSource(os.path.join(launch_dir, "navigation.launch.py")),
         launch_arguments={
             "use_sim_time": "False",
             "params_file": configured_params,
