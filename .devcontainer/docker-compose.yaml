@@ -4,15 +4,15 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        USER_NAME: "${USER_NAME}"
+        USER_NAME: "dev"
         USER_ID: "${HOST_UID}"
         GROUP_ID: "${HOST_GID}"
-        BASE_IMAGE: "ros:iron-perception"
+        BASE_IMAGE: "ros:jazzy-perception"
     container_name: ros2_dev_container
     volumes:
-      - ..:/home/dev/
+      - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix  # Mount X11 socket
-    working_dir: /home/dev/
+    working_dir: /home/dev/ros_ws
     environment:
       - DISPLAY=${DISPLAY}  # Pass the DISPLAY variable
     #   - NVIDIA_VISIBLE_DEVICES=all

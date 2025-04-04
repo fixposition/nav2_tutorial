@@ -1,84 +1,66 @@
 # Dockerfile
-# Accept BASE_IMAGE as a build argument with a default value
-ARG BASE_IMAGE=ros:iron-perception
+
+ARG BASE_IMAGE=ros:jazzy-perception
 FROM ${BASE_IMAGE}
 
-# Set environment variable to prevent interactive prompts during package installation
-ENV DEBIAN_FRONTEND                 noninteractive
-ENV QT_X11_NO_MITSHM                1
-ENV TERM                            xterm-256color
+# Remove the default "ubuntu" user so that UID 1000 is free.
+RUN userdel -r ubuntu || true
 
-# Install APT packages including Python and pip
+# Set environment variables to avoid interactive prompts and to configure terminal behavior.
+ENV DEBIAN_FRONTEND=noninteractive
+ENV QT_X11_NO_MITSHM=1
+ENV TERM=xterm-256color
+
+# Install required APT packages.
 RUN apt update && apt install -y \
-    # Ubuntu essentials    
     libasio-dev \
     apt-utils \
     wget \
     unzip \
     git-all \
-    # Python essentials
-#     python3 \
-#     python3-pip \
-#     python3-venv \
-#     python3-tk \
-    # Libraries for X11 visualization
     libx11-dev \
     libxrender1 \
     libxext6 \
     libfontconfig1 \
-    # Other dependencies
     libglib2.0-0 \
-    # Agilex dependencies
     kmod \
     iproute2 \
     can-utils \
     net-tools \
-    ros-iron-xacro \
-    # Nav2 dependencies
-    ros-iron-navigation2 \
-    ros-iron-nav2-bringup \
-    ros-iron-mapviz \
-    ros-iron-mapviz-plugins \
-    ros-iron-tile-map
+    ros-jazzy-xacro \
+    ros-jazzy-navigation2 \
+    ros-jazzy-nav2-bringup \
+    ros-jazzy-mapviz \
+    ros-jazzy-mapviz-plugins \
+    ros-jazzy-tile-map \
+    ros-jazzy-teleop-twist-keyboard \
+    sudo \
+ && rm -rf /var/lib/apt/lists/*
 
-# Remove cached data
-RUN rm -rf /var/lib/apt/lists/*
-
-# # Upgrade pip to the latest version (optional but recommended)
-# # RUN pip3 install --upgrade pip --break-system-packages
-
-# # Install Python packages
-# RUN pip3 install --no-cache-dir --break-system-packages \
-#     scikit-learn \
-#     opencv-python \
-#     matplotlib \
-#     pandas \
-#     ipython \
-#     tqdm
-
-# Add Build Arguments for UID and GID
-ARG USER_NAME=ubuntu
+# Build arguments for the new user.
+ARG USER_NAME=dev
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
-# Create a group with the same GID as the host
-RUN groupadd --gid ${GROUP_ID} ${USER_NAME} || echo "Group ${USER_NAME} already exists"
-
-# Create a user with the specified UID and GID
-RUN useradd --uid ${USER_ID} --gid ${GROUP_ID} --shell /bin/bash --create-home ${USER_NAME}
-
-# **Add passwordless sudo for devuser**
-RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USER_NAME} && \
+# Create a new group and user with the specified UID/GID, and grant passwordless sudo.
+RUN groupadd --gid ${GROUP_ID} ${USER_NAME} || echo "Group ${USER_NAME} already exists" && \
+    useradd --uid ${USER_ID} --gid ${GROUP_ID} --shell /bin/bash --create-home ${USER_NAME} && \
+    echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USER_NAME} && \
     chmod 0440 /etc/sudoers.d/${USER_NAME}
 
-# Switch to the non-root user
+# As root, add global shell configuration for color support to /etc/bash.bashrc.
+USER root
+RUN echo "alias ls='ls --color=auto'" >> /etc/bash.bashrc && \
+    echo "export PS1='\[\e[0;32m\]\u@\h:\w\$ \[\e[m\]'" >> /etc/bash.bashrc
+
+# Switch to the new "dev" user.
 USER ${USER_NAME}
 
-# Make sure new shells source ROS setup
-RUN echo "source /opt/ros/iron/setup.bash" >> /home/${USER_NAME}/.bashrc
+# Also add the ROS environment setup to the dev user's .bashrc.
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/${USER_NAME}/.bashrc
 
-# Add /home/${USER_NAME}/.local/bin to PATH
+# Ensure the user's local bin is in PATH.
 ENV PATH=/home/${USER_NAME}/.local/bin:${PATH}
 
-# Set DISPLAY variable
+# Set DISPLAY for X11 forwarding.
 ENV DISPLAY=:0
