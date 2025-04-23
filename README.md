@@ -4,8 +4,8 @@
 
 ## Step 1: Set up workspace
 ### Environment
-1. Ubuntu 20.04 LTS
-2. ROS Version: ROS2 Iron
+1. Ubuntu 24.04 LTS
+2. ROS Version: ROS2 Jazzy
 
 ### ROS Packages
 The following ROS packages are required for this project:
@@ -60,7 +60,7 @@ converter:
 Build the ROS2 workspace.
 ```
 source /opt/ros/iron/setup.bash
-colcon build
+colcon build --cmake-args -DBUILD_TESTING=OFF
 ```
 
 
@@ -112,7 +112,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 Launch the ROS nodes in the following order:
 ```
 ros2 launch scout_base scout_mini_base.launch.py
-ros2 launch fixposition_driver_ros2 node.launch
+ros2 launch nav2_tutorial fp_driver_node.launch config:=fp_driver_config.yaml
 ros2 launch nav2_tutorial gps_waypoint_follower.launch.py use_mapviz:=True
 ```
 
