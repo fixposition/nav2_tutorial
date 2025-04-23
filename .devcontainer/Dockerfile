@@ -1,5 +1,4 @@
 # Dockerfile
-
 ARG BASE_IMAGE=ros:jazzy-perception
 FROM ${BASE_IMAGE}
 
@@ -11,31 +10,44 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV QT_X11_NO_MITSHM=1
 ENV TERM=xterm-256color
 
-# Install required APT packages.
-RUN apt update && apt install -y \
-    libasio-dev \
-    apt-utils \
-    wget \
-    unzip \
-    git-all \
-    libx11-dev \
-    libxrender1 \
-    libxext6 \
-    libfontconfig1 \
-    libglib2.0-0 \
-    kmod \
-    iproute2 \
-    can-utils \
-    net-tools \
-    ros-jazzy-xacro \
-    ros-jazzy-navigation2 \
-    ros-jazzy-nav2-bringup \
-    ros-jazzy-mapviz \
-    ros-jazzy-mapviz-plugins \
-    ros-jazzy-tile-map \
-    ros-jazzy-teleop-twist-keyboard \
-    sudo \
- && rm -rf /var/lib/apt/lists/*
+# Install common APT packages, then conditionally install Mapviz on x86.
+RUN apt update && \
+    apt install -y \
+      libasio-dev \
+      apt-utils \
+      wget \
+      unzip \
+      git-all \
+      libx11-dev \
+      libxrender1 \
+      libxext6 \
+      libfontconfig1 \
+      libglib2.0-0 \
+      kmod \
+      iproute2 \
+      can-utils \
+      net-tools \
+      ros-jazzy-xacro \
+      ros-jazzy-navigation2 \
+      ros-jazzy-nav2-bringup \
+      ros-jazzy-teleop-twist-keyboard \
+      sudo && \
+    \
+    # Detect device architecture.
+    arch="$(dpkg --print-architecture)" && \
+    echo "Detected architecture: ${arch}" && \
+    if [ "${arch}" = "amd64" ]; then \
+      echo "Installing Mapviz packages on x86…" && \
+      apt install -y \
+        ros-jazzy-mapviz \
+        ros-jazzy-mapviz-plugins \
+        ros-jazzy-tile-map ; \
+    else \
+      echo "Skipping Mapviz packages on ${arch}" ; \
+    fi && \
+    \
+    # Clean up apt cache.
+    rm -rf /var/lib/apt/lists/*
 
 # Build arguments for the new user.
 ARG USER_NAME=dev
@@ -56,7 +68,7 @@ RUN echo "alias ls='ls --color=auto'" >> /etc/bash.bashrc && \
 # Switch to the new "dev" user.
 USER ${USER_NAME}
 
-# Also add the ROS environment setup to the dev user's .bashrc.
+# Add the ROS environment setup to the dev user's .bashrc.
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/${USER_NAME}/.bashrc
 
 # Ensure the user's local bin is in PATH.
