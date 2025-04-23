@@ -59,7 +59,7 @@ converter:
 ## Step 3: Build ROS2 workspace
 Build the ROS2 workspace.
 ```
-source /opt/ros/iron/setup.bash
+source /opt/ros/jazzy/setup.bash
 colcon build --cmake-args -DBUILD_TESTING=OFF
 ```
 
@@ -98,13 +98,13 @@ can0 311 [8] 00 00 25 C6 FF FF F0 A4
 
 In terminal 1, run these commands to start the base node for the Scout robot:
 ```
-source /opt/ros/iron/setup.bash && source install/setup.bash
+source /opt/ros/jazzy/setup.bash && source install/setup.bash
 ros2 launch scout_base scout_mini_base.launch.py
 ```
 
 In terminal 2, run these commands to start the keyboard-based controller:
 ```
-source /opt/ros/iron/setup.bash
+source /opt/ros/jazzy/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
@@ -113,7 +113,12 @@ Launch the ROS nodes in the following order:
 ```
 ros2 launch scout_base scout_mini_base.launch.py
 ros2 launch nav2_tutorial fp_driver_node.launch config:=fp_driver_config.yaml
-ros2 launch nav2_tutorial gps_waypoint_follower.launch.py use_mapviz:=True
+ros2 launch nav2_tutorial gps_waypoint_follower.launch.py
+```
+
+For launching the graphical interface, you can run the following command (note that this only works on x86/amd64 devices):
+```
+ros2 launch nav2_tutorial mapviz.launch.py
 ```
 
 Finally, start the navigation. There are two types waypoint following methods. We can only choose one method each time we execute it.
@@ -127,10 +132,10 @@ ros2 run nav2_tutorial interactive_waypoint_follower
 
 First, the user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
 ```
-ros2 run nav2_tutorial gps_waypoint_logger
+ros2 run nav2_tutorial gps_waypoint_logger /path/to/file
 ```
 
 Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints.
 ```
-ros2 run nav2_tutorial logged_waypoint_follower ~/gps_waypoints.yaml
+ros2 run nav2_tutorial logged_waypoint_follower /path/to/file
 ```

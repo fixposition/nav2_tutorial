@@ -15,6 +15,7 @@ RUN apt update && \
     apt install -y \
       libasio-dev \
       apt-utils \
+      nano \
       wget \
       unzip \
       git-all \
@@ -27,6 +28,7 @@ RUN apt update && \
       iproute2 \
       can-utils \
       net-tools \
+      python3-tk \
       ros-jazzy-xacro \
       ros-jazzy-navigation2 \
       ros-jazzy-nav2-bringup \
