@@ -1,12 +1,15 @@
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import NavSatFix, Imu
-from geometry_msgs.msg import Vector3Stamped
-import yaml
 import os
 import sys
+import yaml
+
+import rclpy
+from rclpy.node import Node
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import NavSatFix
+
 import tkinter as tk
 from tkinter import messagebox
+
 from src.utils.gps_utils import euler_from_quaternion
 
 
@@ -39,10 +42,10 @@ class GpsGuiLogger(tk.Tk, Node):
         )
         self.last_gps_position = NavSatFix()
 
-        self.imu_subscription = self.create_subscription(
-            Vector3Stamped,
-            '/fixposition/imu_ypr',
-            self.imu_callback,
+        self.yaw_subscription = self.create_subscription(
+            Odometry,
+            '/fixposition/odometry_enu',
+            self.yaw_callback,
             1
         )
         self.last_heading = 0.0
@@ -54,11 +57,11 @@ class GpsGuiLogger(tk.Tk, Node):
         self.last_gps_position = msg
         self.updateTextBox()
 
-    def imu_callback(self, msg: Imu):
+    def yaw_callback(self, msg: Odometry):
         """
         Callback to store the last heading
         """
-        self.last_heading = msg.vector.z
+        self.last_heading = euler_from_quaternion(msg.pose.pose.orientation)[2]
         self.updateTextBox()
 
     def updateTextBox(self):
@@ -72,20 +75,20 @@ class GpsGuiLogger(tk.Tk, Node):
         """
         Function to save a new waypoint to a file
         """
-        # read existing waypoints
+        # Read existing waypoints
         try:
             with open(self.logging_file_path, 'r') as yaml_file:
                 existing_data = yaml.safe_load(yaml_file)
-        # in case the file does not exist, create with the new wps
+        # If the file does not exist, create with the new wps
         except FileNotFoundError:
             existing_data = {"waypoints": []}
-        # if other exception, raise the warining
+        # If other exception, raise the warning
         except Exception as ex:
             messagebox.showerror(
                 "Error", f"Error logging position: {str(ex)}")
             return
 
-        # build new waypoint object
+        # Build new waypoint object
         data = {
             "latitude": self.last_gps_position.latitude,
             "longitude": self.last_gps_position.longitude,
@@ -93,7 +96,7 @@ class GpsGuiLogger(tk.Tk, Node):
         }
         existing_data["waypoints"].append(data)
 
-        # write updated waypoints
+        # Write updated waypoints
         try:
             with open(self.logging_file_path, 'w') as yaml_file:
                 yaml.dump(existing_data, yaml_file, default_flow_style=False)
@@ -108,7 +111,7 @@ class GpsGuiLogger(tk.Tk, Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    # allow to pass the logging path as an argument
+    # Allow to pass the logging path as an argument
     default_yaml_file_path = os.path.expanduser("~/gps_waypoints.yaml")
     if len(sys.argv) > 1:
         yaml_file_path = sys.argv[1]
@@ -117,11 +120,14 @@ def main(args=None):
 
     gps_gui_logger = GpsGuiLogger(yaml_file_path)
 
+    # Spin ROS system and Tk interface
     while rclpy.ok():
-        # we spin both the ROS system and the interface
-        rclpy.spin_once(gps_gui_logger, timeout_sec=0.1)  # Run ros2 callbacks
-        gps_gui_logger.update()  # Update the tkinter interface
-
+        # Run ROS2 callbacks
+        rclpy.spin_once(gps_gui_logger, timeout_sec=0.1)
+        # Update the Tkinter interface
+        gps_gui_logger.update()
+    
+    # Clean up
     rclpy.shutdown()
 
 

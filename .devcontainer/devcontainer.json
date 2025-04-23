@@ -1,15 +1,16 @@
 // .devcontainer/devcontainer.json
 {
-    "name": "ROS2 Dev Container",
-    "dockerComposeFile": ["../.devcontainer/docker-compose.yaml"],
-    "service": "app",
-    "workspaceFolder": "/home/dev/",
-    "extensions": [
-      "ms-python.python",
-      "ms-toolsai.jupyter"
-    ],
-    "settings": {
-      "python.pythonPath": "/usr/bin/python3"
-    },
-    "remoteUser": "ubuntu"
+  "name": "ROS2 Dev Container",
+  "dockerComposeFile": ["../.devcontainer/docker-compose.yaml"],
+  "service": "app",
+  "workspaceFolder": "/home/dev/ros_ws",
+  "extensions": [
+    "ms-python.python",
+    "ms-toolsai.jupyter"
+  ],
+  "settings": {
+    "python.pythonPath": "/usr/bin/python3"
+  },
+  "remoteUser": "dev",
+  "updateRemoteUserUID": false
 }

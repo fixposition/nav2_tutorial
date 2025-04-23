@@ -1,10 +1,11 @@
-import rclpy
-from nav2_simple_commander.robot_navigator import BasicNavigator
-import yaml
-from ament_index_python.packages import get_package_share_directory
 import os
 import sys
 import time
+import yaml
+
+import rclpy
+from nav2_simple_commander.robot_navigator import BasicNavigator
+from ament_index_python.packages import get_package_share_directory
 
 from src.utils.gps_utils import latLonYaw2Geopose
 
@@ -47,15 +48,15 @@ class GpsWpCommander():
         self.navigator.followGpsWaypoints(wps)
         while (not self.navigator.isTaskComplete()):
             time.sleep(0.1)
-        print("wps completed successfully")
+        print("Wps completed successfully")
 
 
 def main():
     rclpy.init()
 
-    # allow to pass the waypoints file as an argument
+    # Allow to pass the waypoints file as an argument
     default_yaml_file_path = os.path.join(get_package_share_directory(
-        "nav2_tutorial"), "config", "demo_waypoints.yaml")
+        "nav2_tutorial"), "config", "gps_waypoints.yaml")
     if len(sys.argv) > 1:
         yaml_file_path = sys.argv[1]
     else:
