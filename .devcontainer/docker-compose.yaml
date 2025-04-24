@@ -25,6 +25,13 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
     environment:
       - DISPLAY=${DISPLAY}
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        source /opt/ros/jazzy/setup.bash
+        source install/setup.bash
 
   scout:
     <<: *ros-common
@@ -46,7 +53,7 @@ services:
           echo "[scout] Could not bring up can0! -- continuing anyway"
         fi
 
-        echo "[scout] Sourcing ROS 2 jazzyp workspace..."
+        echo "[scout] Sourcing ROS2 workspace..."
         source /opt/ros/jazzy/setup.bash
         source install/setup.bash
 

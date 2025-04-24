@@ -116,6 +116,10 @@ gs_usb
 can-utils
 ```
 
+In addition, in case the error messsage 'RTNETLINK answers: Device or resource busy' appears, please run the following command:
+```
+sudo ip link set can0 down
+```
 
 ### Control the Scout robot using the keyboard
 
