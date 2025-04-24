@@ -28,3 +28,5 @@ services:
     tty: true
     network_mode: "host"
     restart: always
+    capabilities:
+      - CAP_NET_ADMIN
