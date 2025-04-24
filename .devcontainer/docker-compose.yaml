@@ -18,7 +18,6 @@ x-ros-common: &ros-common
   environment:
     - ROS_DOMAIN_ID=0
     - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-    - FASTRTPS_DEFAULT_PROFILES_FILE=/home/dev/ros_ws/config/fastdds_profile.xml
 
 services:
   app:
