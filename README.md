@@ -25,7 +25,7 @@ The user can also compile the provided Docker container in the .devcontainer fol
 ```
 docker compose -f .devcontainer/docker-compose.yaml build
 docker compose -f .devcontainer/docker-compose.yaml up -d
-docker exec -it ros2_dev_container bash
+docker compose exec app bash
 ```
 Alternatively, the user can compile it directly using the Dev Containers extension in VSCode.
 

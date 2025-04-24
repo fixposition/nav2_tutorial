@@ -1,6 +1,4 @@
-version: '3.8'
-
-# shared bits between all of your ROS-2 services
+# Shared components between all other services
 x-ros-common: &ros-common
   build:
     context: .
@@ -14,37 +12,42 @@ x-ros-common: &ros-common
     - ..:/home/dev/ros_ws
     - /tmp/.X11-unix:/tmp/.X11-unix
   working_dir: /home/dev/ros_ws
-  environment:
-    - DISPLAY=${DISPLAY}
   network_mode: host
   restart: always
+  stdin_open: true
+  tty: true
 
 services:
   app:
     <<: *ros-common
     container_name: ros2_dev_container
-    stdin_open: true
-    tty: true
-    cap_add:
-      - CAP_NET_ADMIN
+    environment:
+      - DISPLAY=${DISPLAY}
 
   scout:
     <<: *ros-common
     container_name: ros2_scout
-    user: root                  # so we can run ip link
     cap_add:
-      - CAP_NET_ADMIN           # grant just enough to do 'ip link'
+      - CAP_NET_ADMIN
+    restart: on-failure
     entrypoint:
       - bash
       - -c
       - |
         set -e
-        # bring up CANbus
-        ip link set can0 up type can bitrate 500000
-        # source both workspaces
+
+        echo "[scout] Bringing up CAN interface..."
+        if ip link set can0 up type can bitrate 500000; then
+          echo "[scout] CAN0 up at 500kbit"
+        else
+          echo "[scout] Could not bring up can0! -- continuing anyway"
+        fi
+
+        echo "[scout] Sourcing ROS 2 jazzyp workspace..."
         source /opt/ros/jazzy/setup.bash
         source install/setup.bash
-        # exec so it gets proper PID 1 & signals
+
+        echo "[scout] Launching scout_base..."
         exec ros2 launch scout_base scout_mini_base.launch.py
 
   driver:
