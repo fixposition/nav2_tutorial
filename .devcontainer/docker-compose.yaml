@@ -1,4 +1,6 @@
-# Shared components between all other services
+version: '3.8'
+
+# Shared components between all services
 x-ros-common: &ros-common
   build:
     context: .
@@ -17,7 +19,7 @@ x-ros-common: &ros-common
   tty: true
   environment:
     - ROS_DOMAIN_ID=0
-    - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 services:
   app:
@@ -35,6 +37,7 @@ services:
         set -e
         source /opt/ros/jazzy/setup.bash
         source install/setup.bash
+        exec bash
 
   scout:
     <<: *ros-common
@@ -48,7 +51,6 @@ services:
       - -c
       - |
         set -e
-
         echo "[scout] Bringing up CAN interface..."
         if ip link set can0 up type can bitrate 500000; then
           echo "[scout] CAN0 up at 500kbit"
@@ -67,7 +69,7 @@ services:
     <<: *ros-common
     container_name: ros2_driver
     depends_on:
-      - scout                  # wait for CAN bring-up first
+      - scout
     entrypoint:
       - bash
       - -c
@@ -75,4 +77,5 @@ services:
         set -e
         source /opt/ros/jazzy/setup.bash
         source install/setup.bash
-        exec ros2 launch nav2_tutorial fp_driver_node.launch config:=fp_driver_config.yaml
+        exec ros2 launch nav2_tutorial fp_driver_node.launch \
+          config:=fp_driver_config.yaml
