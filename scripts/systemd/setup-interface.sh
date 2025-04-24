@@ -8,7 +8,7 @@ fi
 
 # install the executable
 install -Dm755 can-interface.sh \
-  /usr/local/bin/can-interface
+  /usr/local/bin/can-interface.sh
 
 # install the systemd unit
 install -Dm644 can-interface.service \
