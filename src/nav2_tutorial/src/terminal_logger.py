@@ -27,7 +27,7 @@ class GpsKeyLogger(Node):
         super().__init__('gps_waypoint_keylogger')
 
         self.logging_file_path = logging_file_path
-        self.last_gps = None  # will hold NavSatFix
+        self.last_gps = None
         self.last_yaw = 0.0
 
         self.create_subscription(
@@ -52,7 +52,7 @@ class GpsKeyLogger(Node):
         self.last_gps = msg
 
     def yaw_callback(self, msg: Odometry):
-        # extract yaw from quaternion
+        # Extract yaw from quaternion
         _, _, self.last_yaw = euler_from_quaternion(msg.pose.pose.orientation)
 
     def log_waypoint(self):
@@ -60,7 +60,7 @@ class GpsKeyLogger(Node):
             self.get_logger().warn("No GPS fix yet; skipping log.")
             return
 
-        # load existing or start fresh
+        # Load existing file or generate a new one
         try:
             with open(self.logging_file_path, 'r') as f:
                 data = yaml.safe_load(f) or {}
@@ -100,23 +100,24 @@ def stdin_ready():
 def main(argv=None):
     rclpy.init(args=argv)
 
-    # 1) If the user passed an explicit path, use it
+    # If the user passed an explicit path, use it
     if len(sys.argv) > 1:
         yaml_path = sys.argv[1]
 
     else:
-        # 2) Find the *install* share directory for nav2_tutorial
+        # Find the *install* share directory for nav2_tutorial
         share_dir = get_package_share_directory('nav2_tutorial')
-        # climb up: share/nav2_tutorial -> share -> install -> workspace root
+        
+        # Climb up: share/nav2_tutorial -> share -> install -> workspace root
         ws_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(share_dir))))
-        print(ws_root)
-        # build the path to your src/config
+        
+        # Build the path to your src/config
         src_config = os.path.join(ws_root, 'src', 'nav2_tutorial', 'config')
 
         if os.path.isdir(src_config):
             config_dir = src_config
         else:
-            # fallback to the installed share/config
+            # Fallback to the installed share/config
             config_dir = os.path.join(share_dir, 'config')
 
         os.makedirs(config_dir, exist_ok=True)
@@ -126,7 +127,7 @@ def main(argv=None):
 
     node = GpsKeyLogger(yaml_path)
 
-    # set terminal into raw mode
+    # Set terminal into raw mode
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     tty.setcbreak(fd)
