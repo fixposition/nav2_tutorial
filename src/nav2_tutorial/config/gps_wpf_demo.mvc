@@ -37,7 +37,7 @@ displays:
     config:
       visible: true
       collapsed: false
-      frame: base_link
+      frame: vrtk_link
       color: "#00ff00"
       draw_style: arrows
       position_tolerance: 0

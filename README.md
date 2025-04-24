@@ -21,8 +21,13 @@ git submodule update --init --recursive
 
 
 ### (Optional) Docker container
-- The user can also compile the provided Docker container in the .devcontainer folder to test this tutorial.
-
+The user can also compile the provided Docker container in the .devcontainer folder to test this tutorial. To achieve this, the following commands can be used:
+```
+docker compose -f .devcontainer/docker-compose.yaml build
+docker compose -f .devcontainer/docker-compose.yaml up -d
+docker exec -it ros2_dev_container bash
+```
+Alternatively, the user can compile it directly using the Dev Containers extension in VSCode.
 
 ## Step 2: Set up Fixposition ROS Driver
 
@@ -80,6 +85,10 @@ sudo modprobe gs_usb can-utils
 sudo ip link set can0 up type can bitrate 500000
 candump can0
 ```
+Alternatively, the user can also directly execute the provided script start_can.sh:
+```
+sudo ./scripts/start_can.sh
+```
 
 Example output from the can0 port:
 ```
@@ -133,6 +142,11 @@ ros2 run nav2_tutorial interactive_waypoint_follower
 First, the user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
 ```
 ros2 run nav2_tutorial gps_waypoint_logger /path/to/file
+```
+
+If your terminal does not support X11 forwarding, you can use the following script:
+```
+ros2 run nav2_tutorial terminal_logger
 ```
 
 Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints.
