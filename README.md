@@ -35,6 +35,7 @@ docker compose logs scout
 docker compose logs driver
 ```
 
+
 ## Step 2: Set up Fixposition ROS Driver
 
 To use the ROS driver with the Scout robot, the following changes must be applied:
@@ -67,6 +68,7 @@ converter:
     use_z: false               # Transmit the z axis of the input velocity
 ```
 
+
 ## Step 3: Build ROS2 workspace
 Build the ROS2 workspace.
 ```
@@ -91,6 +93,7 @@ sudo modprobe gs_usb can-utils
 sudo ip link set can0 up type can bitrate 500000
 candump can0
 ```
+
 Alternatively, the user can also directly execute the provided script start_can.sh:
 ```
 sudo ./scripts/start_can.sh

@@ -1,19 +1,17 @@
 version: '3.8'
 
-# Shared components between all services
+# Shared bits for all three services
 x-ros-common: &ros-common
   build:
     context: .
-    dockerfile: Dockerfile
-    args:
-      USER_NAME: "dev"
-      USER_ID: "${HOST_UID}"
-      GROUP_ID: "${HOST_GID}"
-      BASE_IMAGE: "ros:jazzy-perception"
+    dockerfile: Dockerfile        # make sure it installs rmw_cyclonedds_cpp
   volumes:
     - ..:/home/dev/ros_ws
+    - /dev/shm:/dev/shm           # ← share the host SHM for CycloneDDS
   working_dir: /home/dev/ros_ws
   network_mode: host
+  ipc: host
+  pid: host
   restart: always
   stdin_open: true
   tty: true
@@ -32,7 +30,7 @@ services:
       - DISPLAY=${DISPLAY}
     entrypoint:
       - bash
-      - -c
+      - -lc
       - |
         set -e
         source /opt/ros/jazzy/setup.bash
@@ -48,9 +46,8 @@ services:
     restart: on-failure
     entrypoint:
       - bash
-      - -c
+      - -lc
       - |
-        set -e
         echo "[scout] Bringing up CAN interface..."
         if ip link set can0 up type can bitrate 500000; then
           echo "[scout] CAN0 up at 500kbit"
@@ -72,9 +69,8 @@ services:
       - scout
     entrypoint:
       - bash
-      - -c
+      - -lc 
       - |
-        set -e
         source /opt/ros/jazzy/setup.bash
         source install/setup.bash
         exec ros2 launch nav2_tutorial fp_driver_node.launch \
