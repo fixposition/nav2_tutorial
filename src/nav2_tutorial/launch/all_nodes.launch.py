@@ -1,0 +1,37 @@
+# launch/all_nodes.launch.py
+
+import os
+from launch import LaunchDescription
+from launch.actions import GroupAction, IncludeLaunchDescription, ExecuteProcess
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+def generate_launch_description():
+    pkg_share = os.path.join(
+        get_package_share_directory('your_meta_package'), 'launch')
+
+    return LaunchDescription([
+        # 1) CAN bring-up (just an OS command)
+        ExecuteProcess(
+            cmd=[
+                'ip', 'link', 'set', 'can0', 'up',
+                'type', 'can', 'bitrate', '500000'
+            ],
+            output='screen',
+            shell=False
+        ),
+
+        # 2) Scout node
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_share, 'scout_mini_base.launch.py')
+            ),
+        ),
+
+        # 3) Driver node
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_share, 'fp_driver_node.launch.py')
+            ),
+            launch_arguments={'config': 'config/fp_driver_config.yaml'}.items(),
+        ),
+    ])

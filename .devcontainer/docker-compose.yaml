@@ -1,77 +1,38 @@
 version: '3.8'
 
-# Shared bits for all three services
-x-ros-common: &ros-common
-  build:
-    context: .
-    dockerfile: Dockerfile        # make sure it installs rmw_cyclonedds_cpp
-  volumes:
-    - ..:/home/dev/ros_ws
-    - /dev/shm:/dev/shm           # ← share the host SHM for CycloneDDS
-  working_dir: /home/dev/ros_ws
-  network_mode: host
-  ipc: host
-  pid: host
-  restart: always
-  stdin_open: true
-  tty: true
-  environment:
-    - ROS_DOMAIN_ID=0
-    - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-
 services:
-  app:
-    <<: *ros-common
-    container_name: ros2_dev_container
+  ros2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_NAME: "dev"
+        USER_ID: "${HOST_UID}"
+        GROUP_ID: "${HOST_GID}"
+        BASE_IMAGE: "ros:jazzy-perception"
+    container_name: ros2_all_in_one
     volumes:
       - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
+    network_mode: host
     environment:
       - DISPLAY=${DISPLAY}
+    restart: always
+    stdin_open: true
+    tty: true
     entrypoint:
       - bash
       - -lc
       - |
-        set -e
-        source /opt/ros/jazzy/setup.bash
-        source install/setup.bash
-        exec bash
+          set -e
+          # bring up CAN
+          echo "[entrypoint] Bringing up can0"
+          ip link set can0 up type can bitrate 500000 || \
+            echo "[entrypoint] can't bring up can0, continuing"
 
-  scout:
-    <<: *ros-common
-    container_name: ros2_scout
-    user: root
-    cap_add:
-      - CAP_NET_ADMIN
-    restart: on-failure
-    entrypoint:
-      - bash
-      - -lc
-      - |
-        echo "[scout] Bringing up CAN interface..."
-        if ip link set can0 up type can bitrate 500000; then
-          echo "[scout] CAN0 up at 500kbit"
-        else
-          echo "[scout] Could not bring up can0! -- continuing anyway"
-        fi
+          # source both installs
+          source /opt/ros/jazzy/setup.bash
+          source install/setup.bash
 
-        echo "[scout] Sourcing ROS2 workspace..."
-        source /opt/ros/jazzy/setup.bash
-        source install/setup.bash
-
-        echo "[scout] Launching scout_base..."
-        exec ros2 launch scout_base scout_mini_base.launch.py
-
-  driver:
-    <<: *ros-common
-    container_name: ros2_driver
-    depends_on:
-      - scout
-    entrypoint:
-      - bash
-      - -lc 
-      - |
-        source /opt/ros/jazzy/setup.bash
-        source install/setup.bash
-        exec ros2 launch nav2_tutorial fp_driver_node.launch \
-          config:=fp_driver_config.yaml
+          # launch everything in one go
+          exec ros2 launch your_meta_package all_nodes.launch.py

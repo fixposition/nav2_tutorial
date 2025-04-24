@@ -33,7 +33,6 @@ RUN apt update && \
       ros-jazzy-navigation2 \
       ros-jazzy-nav2-bringup \
       ros-jazzy-teleop-twist-keyboard \
-      ros-jazzy-rmw-cyclonedds-cpp \
       sudo && \
     \
     # Detect device architecture.
