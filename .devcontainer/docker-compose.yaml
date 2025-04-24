@@ -21,6 +21,7 @@ services:
     <<: *ros-common
     container_name: ros2_dev_container
     volumes:
+      - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
     environment:
       - DISPLAY=${DISPLAY}

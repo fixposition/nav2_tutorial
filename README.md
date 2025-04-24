@@ -29,6 +29,12 @@ docker compose exec app bash
 ```
 Alternatively, the user can compile it directly using the Dev Containers extension in VSCode.
 
+To check the status of the different services, you can run the following commands:
+```
+docker compose logs scout
+docker compose logs driver
+```
+
 ## Step 2: Set up Fixposition ROS Driver
 
 To use the ROS driver with the Scout robot, the following changes must be applied:
