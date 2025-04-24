@@ -10,7 +10,6 @@ x-ros-common: &ros-common
       BASE_IMAGE: "ros:jazzy-perception"
   volumes:
     - ..:/home/dev/ros_ws
-    - /tmp/.X11-unix:/tmp/.X11-unix
   working_dir: /home/dev/ros_ws
   network_mode: host
   restart: always
@@ -21,12 +20,15 @@ services:
   app:
     <<: *ros-common
     container_name: ros2_dev_container
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
     environment:
       - DISPLAY=${DISPLAY}
 
   scout:
     <<: *ros-common
     container_name: ros2_scout
+    user: root
     cap_add:
       - CAP_NET_ADMIN
     restart: on-failure
