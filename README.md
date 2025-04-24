@@ -103,6 +103,14 @@ can0 311 [8] 00 00 25 C6 FF FF F0 A4
 ...
 ```
 
+Note: To automatically establish the connection to the Agilex, you can edit the /etc/modules file as such:
+```
+# /etc/modules: kernel modules to load at boot time.
+gs_usb
+can-utils
+```
+
+
 ### Control the Scout robot using the keyboard
 
 In terminal 1, run these commands to start the base node for the Scout robot:

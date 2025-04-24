@@ -1,32 +1,62 @@
+version: '3.8'
+
+# shared bits between all of your ROS-2 services
+x-ros-common: &ros-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      USER_NAME: "dev"
+      USER_ID: "${HOST_UID}"
+      GROUP_ID: "${HOST_GID}"
+      BASE_IMAGE: "ros:jazzy-perception"
+  volumes:
+    - ..:/home/dev/ros_ws
+    - /tmp/.X11-unix:/tmp/.X11-unix
+  working_dir: /home/dev/ros_ws
+  environment:
+    - DISPLAY=${DISPLAY}
+  network_mode: host
+  restart: always
+
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        USER_NAME: "dev"
-        USER_ID: "${HOST_UID}"
-        GROUP_ID: "${HOST_GID}"
-        BASE_IMAGE: "ros:jazzy-perception"
+    <<: *ros-common
     container_name: ros2_dev_container
-    volumes:
-      - ..:/home/dev/ros_ws
-      - /tmp/.X11-unix:/tmp/.X11-unix  # Mount X11 socket
-    working_dir: /home/dev/ros_ws
-    environment:
-      - DISPLAY=${DISPLAY}  # Pass the DISPLAY variable
-    #   - NVIDIA_VISIBLE_DEVICES=all
-    #   - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
     stdin_open: true
     tty: true
-    network_mode: "host"
-    restart: always
-    capabilities:
+    cap_add:
       - CAP_NET_ADMIN
+
+  scout:
+    <<: *ros-common
+    container_name: ros2_scout
+    user: root                  # so we can run ip link
+    cap_add:
+      - CAP_NET_ADMIN           # grant just enough to do 'ip link'
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        # bring up CANbus
+        ip link set can0 up type can bitrate 500000
+        # source both workspaces
+        source /opt/ros/jazzy/setup.bash
+        source install/setup.bash
+        # exec so it gets proper PID 1 & signals
+        exec ros2 launch scout_base scout_mini_base.launch.py
+
+  driver:
+    <<: *ros-common
+    container_name: ros2_driver
+    depends_on:
+      - scout                  # wait for CAN bring-up first
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        source /opt/ros/jazzy/setup.bash
+        source install/setup.bash
+        exec ros2 launch nav2_tutorial fp_driver_node.launch config:=fp_driver_config.yaml
