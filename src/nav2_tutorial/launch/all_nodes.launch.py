@@ -3,7 +3,7 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, ExecuteProcess
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.launch_description_sources import PythonLaunchDescriptionSource, XMLLaunchDescriptionSource
 
 
 def generate_launch_description():
@@ -30,8 +30,8 @@ def generate_launch_description():
 
         # 3) Driver node
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(driver_pkg_share, 'fp_driver_node.launch')
+            XMLLaunchDescriptionSource(
+               os.path.join(driver_pkg_share, 'fp_driver_node.launch')
             ),
             launch_arguments={'config': 'config/fp_driver_config.yaml'}.items(),
         ),
