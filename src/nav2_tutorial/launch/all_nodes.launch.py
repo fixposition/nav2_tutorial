@@ -7,7 +7,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
-    scout_pkg_share = get_package_share_directory('scout_mini_base')
+    scout_pkg_share = get_package_share_directory('scout_base')
     driver_pkg_share = os.path.join(get_package_share_directory('nav2_tutorial'), 'launch')
 
     return LaunchDescription([
