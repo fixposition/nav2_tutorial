@@ -12,24 +12,14 @@ def generate_launch_description():
     driver_pkg_share = os.path.join(get_package_share_directory('nav2_tutorial'), 'launch')
 
     return LaunchDescription([
-        # 1) CAN bring-up
-        ExecuteProcess(
-            cmd=[
-                'ip', 'link', 'set', 'can0', 'up',
-                'type', 'can', 'bitrate', '500000'
-            ],
-            output='screen',
-            shell=False
-        ),
-
-        # 2) Scout node
+        # 1) Scout node
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(scout_pkg_share, 'scout_mini_base.launch.py')
             ),
         ),
 
-        # 3) Driver node
+        # 2) Driver node
         IncludeLaunchDescription(
             XMLLaunchDescriptionSource(
                os.path.join(driver_pkg_share, 'fp_driver_node.launch')
