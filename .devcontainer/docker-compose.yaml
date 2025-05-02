@@ -42,7 +42,7 @@ services:
         BASE_IMAGE: "ros:jazzy-perception"
     container_name: ros2_all_in_one
     cap_add:
-      - NET_ADMIN
+      - NET_RAW
     volumes:
       - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
@@ -58,10 +58,6 @@ services:
       - -lc
       - |
           set -e
-          # bring up CAN
-          echo "[entrypoint] Bringing up can0"
-          ip link set can0 up type can bitrate 500000 || \
-            echo "[entrypoint] can't bring up can0, continuing"
 
           # source ROS
           source /opt/ros/jazzy/setup.bash
