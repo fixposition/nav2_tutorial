@@ -1,6 +1,36 @@
 version: '3.8'
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_NAME: "dev"
+        USER_ID: "${HOST_UID}"
+        GROUP_ID: "${HOST_GID}"
+        BASE_IMAGE: "ros:jazzy-perception"
+    container_name: ros2_dev_container
+    volumes:
+      - ..:/home/dev/ros_ws
+      - /tmp/.X11-unix:/tmp/.X11-unix  # Mount X11 socket
+    working_dir: /home/dev/ros_ws
+    network_mode: "host"
+    environment:
+      - DISPLAY=${DISPLAY}  # Pass the DISPLAY variable
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    #   - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    restart: always
+    stdin_open: true
+    tty: true
+  
   ros2:
     build:
       context: .
@@ -35,4 +65,4 @@ services:
           source install/setup.bash
 
           # launch everything in one go
-          exec ros2 launch your_meta_package all_nodes.launch.py
+          exec ros2 launch nav2_tutorial all_nodes.launch.py
