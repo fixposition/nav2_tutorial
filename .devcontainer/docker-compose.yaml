@@ -46,6 +46,7 @@ services:
     volumes:
       - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
+    working_dir: /home/dev/ros_ws
     network_mode: host
     environment:
       - DISPLAY=${DISPLAY}
@@ -68,7 +69,7 @@ services:
           # if the install folder does not exist, build it
           if [ ! -d install ]; then
             echo "[entrypoint] install/ not found, running colcon build…"
-            #colcon build --symlink-install
+            colcon build --cmake-args -DBUILD_TESTING=OFF
           fi
 
           # source the workspace

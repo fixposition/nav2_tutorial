@@ -1,17 +1,17 @@
-# launch/all_nodes.launch.py
-
 import os
-from launch import LaunchDescription
-from launch.actions import GroupAction, IncludeLaunchDescription, ExecuteProcess
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
+
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription, ExecuteProcess
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
 
 def generate_launch_description():
     pkg_share = os.path.join(
-        get_package_share_directory('your_meta_package'), 'launch')
+        get_package_share_directory('nav2_tutorial'), 'launch')
 
     return LaunchDescription([
-        # 1) CAN bring-up (just an OS command)
+        # 1) CAN bring-up
         ExecuteProcess(
             cmd=[
                 'ip', 'link', 'set', 'can0', 'up',
