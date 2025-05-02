@@ -8,7 +8,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     scout_pkg_share = os.path.join(get_package_share_directory('scout_base'), 'launch')
-    driver_pkg_share = os.path.join(get_package_share_directory('fixposition_driver_ros2'), 'launch')
+    driver_pkg_share = os.path.join(get_package_share_directory('nav2_tutorial'), 'launch')
 
     return LaunchDescription([
         # 1) CAN bring-up

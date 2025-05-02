@@ -41,8 +41,6 @@ services:
         GROUP_ID: "${HOST_GID}"
         BASE_IMAGE: "ros:jazzy-perception"
     container_name: ros2_all_in_one
-    cap_add:
-      - NET_RAW
     volumes:
       - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
