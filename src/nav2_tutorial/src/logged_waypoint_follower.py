@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import yaml
+import argparse
+import glob
 
 import rclpy
 from nav2_simple_commander.robot_navigator import BasicNavigator
@@ -30,12 +32,12 @@ class YamlWaypointParser:
         return gepose_wps
 
 
-class GpsWpCommander():
+class GpsWpCommander:
     """
     Class to use nav2 gps waypoint follower to follow a set of waypoints logged in a yaml file
     """
 
-    def __init__(self, wps_file_path):
+    def __init__(self, wps_file_path: str):
         self.navigator = BasicNavigator("basic_navigator")
         self.wp_parser = YamlWaypointParser(wps_file_path)
 
@@ -46,7 +48,7 @@ class GpsWpCommander():
         self.navigator.waitUntilNav2Active(localizer='robot_localization')
         wps = self.wp_parser.get_wps()
         self.navigator.followGpsWaypoints(wps)
-        while (not self.navigator.isTaskComplete()):
+        while not self.navigator.isTaskComplete():
             time.sleep(0.1)
         print("Wps completed successfully")
 
@@ -54,17 +56,45 @@ class GpsWpCommander():
 def main():
     rclpy.init()
 
-    # Allow to pass the waypoints file as an argument
-    default_yaml_file_path = os.path.join(get_package_share_directory(
-        "nav2_tutorial"), "config", "gps_waypoints.yaml")
-    if len(sys.argv) > 1:
-        yaml_file_path = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description="Follow GPS waypoints from a YAML file"
+    )
+    parser.add_argument(
+        'yaml_file', nargs='?', default=None,
+        help='Path to the YAML waypoints file'
+    )
+    parser.add_argument(
+        '--last', action='store_true',
+        help='Load the most recent waypoints file in the config directory'
+    )
+    args = parser.parse_args()
+
+    config_dir = os.path.join(
+        get_package_share_directory('nav2_tutorial'), 'config'
+    )
+
+    if args.last:
+        pattern = os.path.join(config_dir, 'gps_waypoints_*.yaml')
+        files = glob.glob(pattern)
+        if not files:
+            print(f"No files matching {pattern}", file=sys.stderr)
+            sys.exit(1)
+        # filenames with timestamps sort lexically
+        files.sort()
+        yaml_file_path = files[-1]
+        print(f"Loading most recent waypoints file: {yaml_file_path}")
     else:
-        yaml_file_path = default_yaml_file_path
+        if args.yaml_file:
+            yaml_file_path = args.yaml_file
+        else:
+            yaml_file_path = os.path.join(
+                config_dir, 'gps_waypoints.yaml'
+            )
+        print(f"Loading waypoints file: {yaml_file_path}")
 
     gps_wpf = GpsWpCommander(yaml_file_path)
     gps_wpf.start_wpf()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
