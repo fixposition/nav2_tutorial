@@ -66,11 +66,8 @@ services:
           # source ROS
           source /opt/ros/jazzy/setup.bash
 
-          # if the install folder does not exist, build it
-          if [ ! -d install ]; then
-            echo "[entrypoint] install/ not found, running colcon build…"
-            colcon build --cmake-args -DBUILD_TESTING=OFF
-          fi
+          # ensure the workspace is built or latest build is sourced
+          colcon build --cmake-args -DBUILD_TESTING=OFF
 
           # source the workspace
           source install/setup.bash
