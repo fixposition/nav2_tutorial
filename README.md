@@ -25,14 +25,13 @@ The user can also compile the provided Docker container in the .devcontainer fol
 ```
 docker compose -f .devcontainer/docker-compose.yaml build
 docker compose -f .devcontainer/docker-compose.yaml up -d
-docker compose exec app bash
+docker compose -f ~/dev/nav2_tutorial/.devcontainer/docker-compose.yaml exec vrtk bash
 ```
 Alternatively, the user can compile it directly using the Dev Containers extension in VSCode.
 
 To check the status of the different services, you can run the following commands:
 ```
-docker compose logs scout
-docker compose logs driver
+docker compose logs vrtk
 ```
 
 
