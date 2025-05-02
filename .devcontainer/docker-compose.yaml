@@ -43,8 +43,6 @@ services:
     container_name: ros2_all_in_one
     cap_add:
       - NET_ADMIN
-    devices:
-      - /dev/can0:/dev/can0
     volumes:
       - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
