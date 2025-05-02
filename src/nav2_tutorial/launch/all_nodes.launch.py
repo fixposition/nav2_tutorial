@@ -31,7 +31,7 @@ def generate_launch_description():
         # 3) Driver node
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(driver_pkg_share, 'fp_driver_node.launch.py')
+                os.path.join(driver_pkg_share, 'fp_driver_node.launch')
             ),
             launch_arguments={'config': 'config/fp_driver_config.yaml'}.items(),
         ),
