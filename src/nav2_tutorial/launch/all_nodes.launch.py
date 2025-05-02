@@ -7,8 +7,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
-    pkg_share = os.path.join(
-        get_package_share_directory('nav2_tutorial'), 'launch')
+    scout_pkg_share = get_package_share_directory('scout_mini_base')
+    driver_pkg_share = os.path.join(get_package_share_directory('nav2_tutorial'), 'launch')
 
     return LaunchDescription([
         # 1) CAN bring-up
@@ -24,14 +24,14 @@ def generate_launch_description():
         # 2) Scout node
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(pkg_share, 'scout_mini_base.launch.py')
+                os.path.join(scout_pkg_share, 'scout_mini_base.launch.py')
             ),
         ),
 
         # 3) Driver node
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(pkg_share, 'fp_driver_node.launch.py')
+                os.path.join(driver_pkg_share, 'fp_driver_node.launch.py')
             ),
             launch_arguments={'config': 'config/fp_driver_config.yaml'}.items(),
         ),
