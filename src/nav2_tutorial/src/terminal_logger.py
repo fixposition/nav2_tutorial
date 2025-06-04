@@ -112,18 +112,18 @@ def main(argv=None):
         ws_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(share_dir))))
         
         # Build the path to your src/config
-        src_config = os.path.join(ws_root, 'src', 'nav2_tutorial', 'config')
+        src_config = os.path.join(ws_root, 'src', 'nav2_tutorial', 'trajectories')
 
         if os.path.isdir(src_config):
-            config_dir = src_config
+            traj_dir = src_config
         else:
             # Fallback to the installed share/config
-            config_dir = os.path.join(share_dir, 'config')
+            traj_dir = os.path.join(share_dir, 'trajectories')
 
-        os.makedirs(config_dir, exist_ok=True)
+        os.makedirs(traj_dir, exist_ok=True)
 
         stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        yaml_path = os.path.join(config_dir, f'gps_waypoints_{stamp}.yaml')
+        yaml_path = os.path.join(traj_dir, f'gps_waypoints_{stamp}.yaml')
 
     node = GpsKeyLogger(yaml_path)
 
