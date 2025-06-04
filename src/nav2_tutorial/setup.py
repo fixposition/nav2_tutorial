@@ -27,9 +27,11 @@ setup(
     entry_points={
         'console_scripts': [
             'logged_waypoint_follower = src.logged_waypoint_follower:main',
+            'logged_smooth_follower = src.logged_smooth_follower:main',
             'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
             'gps_waypoint_logger = src.gps_waypoint_logger:main',
             'terminal_logger = src.terminal_logger:main',
+            'periodic_logger = src.periodic_logger:main',
             'set_datum = src.set_datum:main'
         ],
     },

@@ -161,7 +161,7 @@ ros2 run nav2_tutorial interactive_waypoint_follower
 
 First, the user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
 ```
-ros2 run nav2_tutorial gps_waypoint_logger /path/to/file
+ros2 run nav2_tutorial gps_waypoint_logger <optional: /path/to/file>
 ```
 
 If your terminal does not support X11 forwarding, you can use the following script:
@@ -169,7 +169,17 @@ If your terminal does not support X11 forwarding, you can use the following scri
 ros2 run nav2_tutorial terminal_logger
 ```
 
-Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints.
+Lastly, you can use a periodic logger to have denser points:
 ```
-ros2 run nav2_tutorial logged_waypoint_follower /path/to/file
+ros2 run nav2_tutorial periodic_logger
+```
+
+Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints:
+```
+ros2 run nav2_tutorial logged_waypoint_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
+```
+
+For a smooth version using a pre-computed trajectory (instead of point-by-point), call the logged_smooth_follower script:
+```
+ros2 run nav2_tutorial logged_smooth_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
 ```
