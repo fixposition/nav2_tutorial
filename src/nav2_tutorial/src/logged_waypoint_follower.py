@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import math
 import yaml
 import glob
 import argparse
@@ -113,26 +114,35 @@ class YamlWaypointParser:
         if "waypoints" not in self.wps_dict:
             raise KeyError(f"Key 'waypoints' missing from YAML file '{wps_file_path}'.")
 
-    def get_wps(self):
-        """Return a list of ``geographic_msgs/msg/GeoPose`` objects parsed from the YAML."""
+    @staticmethod
+    def _reverse_yaw(yaw: float) -> float:
+        """Return yaw rotated by π, wrapped to [-π, π]."""
+        new_yaw = yaw + math.pi
+        # Wrap to [-π, π]
+        return (new_yaw + math.pi) % (2 * math.pi) - math.pi
+
+    def get_wps(self, reverse: bool = False):
+        """Return a list of ``GeoPose`` objects, possibly in reverse order."""
+        waypoints = self.wps_dict["waypoints"][::-1] if reverse else self.wps_dict["waypoints"]
         gepose_wps = []
-        for wp in self.wps_dict["waypoints"]:
-            latitude, longitude, yaw = wp["latitude"], wp["longitude"], wp["yaw"]
-            gepose_wps.append(latLonYaw2Geopose(latitude, longitude, yaw))
+        for wp in waypoints:
+            yaw = self._reverse_yaw(wp["yaw"]) if reverse else wp["yaw"]
+            gepose_wps.append(latLonYaw2Geopose(wp["latitude"], wp["longitude"], yaw))
         return gepose_wps
 
 
 class GpsWpCommander:
     """Use the Nav2 *GPS Waypoint Follower* to follow a set of waypoints."""
 
-    def __init__(self, wps_file_path: str):
+    def __init__(self, wps_file_path: str, reverse: bool = False):
         self.navigator = BasicNavigator("basic_navigator")
         self.wp_parser = YamlWaypointParser(wps_file_path)
+        self.reverse = reverse
 
     def start_wpf(self):
         """Block until all waypoints have been reached."""
         self.navigator.waitUntilNav2Active(localizer="robot_localization")
-        wps = self.wp_parser.get_wps()
+        wps = self.wp_parser.get_wps(reverse=self.reverse)
         self.navigator.followGpsWaypoints(wps)
         while not self.navigator.isTaskComplete():
             time.sleep(0.1)
@@ -145,6 +155,7 @@ def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(description="Follow GPS waypoints from a YAML file")
     parser.add_argument("yaml_file", nargs="?", default=None, help="Path to the YAML waypoints file")
     parser.add_argument("--last", action="store_true", help="Load the most recent waypoints file in the config directory")
+    parser.add_argument("--reverse", action="store_true", help="Follow the trajectory in reverse order (adds 180° to yaw)")
     args = parser.parse_args()
 
     try:
@@ -157,7 +168,7 @@ def main(argv: list[str] | None = None):
     print(f"Loading waypoints file: {yaml_file_path}")
 
     try:
-        gps_wpf = GpsWpCommander(yaml_file_path)
+        gps_wpf = GpsWpCommander(yaml_file_path, reverse=args.reverse)
         gps_wpf.start_wpf()
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
