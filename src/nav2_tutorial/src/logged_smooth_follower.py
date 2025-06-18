@@ -14,7 +14,13 @@ from ament_index_python.packages import get_package_share_directory
 from src.utils.gps_utils import latLonYaw2Geopose
 
 from geometry_msgs.msg import PoseStamped
-from robot_localization.srv import FromLL  
+from robot_localization.srv import FromLL
+
+# Visualization
+from nav_msgs.msg import Path
+from visualization_msgs.msg import Marker, MarkerArray
+from rclpy.qos import QoSProfile, DurabilityPolicy
+MARKER_VIZ = True
 
 
 def quaternion_from_euler(roll: float, pitch: float, yaw: float):
@@ -138,9 +144,8 @@ class YamlWaypointParser:
 
     @staticmethod
     def _reverse_yaw(yaw: float) -> float:
-        """Return yaw rotated by π, wrapped to [-π, π]."""
+        """Return yaw rotated by pi, wrapped to [-pi, pi]."""
         new_yaw = yaw + math.pi
-        # Wrap to [-π, π]
         return (new_yaw + math.pi) % (2 * math.pi) - math.pi
 
     def get_wps(self, reverse: bool = False):
@@ -166,6 +171,18 @@ class GpsWpCommander:
         self.navigator.get_logger().info("Waiting for /fromLL service…")
         if not self._fromll_cli.wait_for_service(timeout_sec=10.0):
             raise RuntimeError("robot_localization /fromLL service is not available")
+        
+        if MARKER_VIZ:
+            latched_qos = QoSProfile(
+                depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
+            # Path for visualizing waypoints
+            self.waypoint_path_pub = self.navigator.create_publisher(
+                    Path, "/gps_waypoints_path", latched_qos)
+
+            # MarkerArray for visualizing waypoints
+            self.waypoint_marker_pub = self.navigator.create_publisher(
+                    MarkerArray, "/gps_waypoints_markers", latched_qos)
 
     # Convert (lat, lon, yaw) to PoseStamped in the map frame
     def _latlon_to_pose(self, lat: float, lon: float, yaw: float) -> PoseStamped:
@@ -180,7 +197,7 @@ class GpsWpCommander:
 
         pose = PoseStamped()
         pose.header.frame_id = "map"
-        pose.header.stamp    = self.navigator.get_clock().now().to_msg()
+        pose.header.stamp    = rclpy.time.Time().to_msg()
         pose.pose.position.x = map_pt.x
         pose.pose.position.y = map_pt.y
         pose.pose.position.z = 0.0
@@ -206,12 +223,36 @@ class GpsWpCommander:
             poses.append(self._latlon_to_pose(
                 wp["latitude"], wp["longitude"], yaw))
 
+        self._publish_waypoints(poses)
         self.navigator.goThroughPoses(poses)
 
         while not self.navigator.isTaskComplete():
             rclpy.spin_once(self.navigator, timeout_sec=0.1)
 
         print("Waypoints completed successfully (continuous mode)")
+        
+    def _publish_waypoints(self, poses):
+        # Path message
+        path = Path()
+        path.header.frame_id = "map"
+        path.header.stamp    = rclpy.time.Time().to_msg()
+        path.poses           = poses
+        self.waypoint_path_pub.publish(path)
+
+        # Optional coloured spheres
+        markers = MarkerArray()
+        for i, p in enumerate(poses):
+            m = Marker()
+            m.header   = path.header
+            m.ns       = "wps"
+            m.id       = i
+            m.type     = Marker.SPHERE
+            m.action   = Marker.ADD
+            m.pose     = p.pose
+            m.scale.x = m.scale.y = m.scale.z = 0.05
+            m.color.r, m.color.g, m.color.b, m.color.a = (0.1, 0.9, 0.1, 1.0)
+            markers.markers.append(m)
+        self.waypoint_marker_pub.publish(markers)
 
 
 def main(argv: list[str] | None = None):
