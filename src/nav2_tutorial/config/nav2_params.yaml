@@ -6,6 +6,7 @@ bt_navigator:
     odom_topic: /odom
     bt_loop_duration: 10
     default_server_timeout: 20
+    transform_tolerance: 0.3
     navigators: ["navigate_to_pose", "navigate_through_poses"]
     navigate_to_pose:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
@@ -36,7 +37,7 @@ controller_server:
       stateful: True
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.8
+      desired_linear_vel: 1.3
       lookahead_dist: 1.0
       min_lookahead_dist: 0.2
       max_lookahead_dist: 2.0
@@ -54,11 +55,11 @@ controller_server:
       use_cost_regulated_linear_velocity_scaling: false
       regulated_linear_scaling_min_radius: 0.9
       regulated_linear_scaling_min_speed: 0.2
-      use_rotate_to_heading: false
+      use_rotate_to_heading: true
       allow_reversing: false
       rotate_to_heading_min_angle: 0.785
       max_angular_accel: 3.2
-      max_robot_pose_search_dist: 100.0
+      max_robot_pose_search_dist: 50.0
       stateful: true
 
 global_costmap:
@@ -66,28 +67,30 @@ global_costmap:
     ros__parameters:
       global_frame: map
       robot_base_frame: base_link
-      width: 100
-      height: 100
       resolution: 0.05
       rolling_window: true
+      width: 50
+      height: 50
       plugins: ["inflation_layer"] # no sensors, so only inflation
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 0.55
+      always_send_full_costmap: True
 
 local_costmap:
   local_costmap:
     ros__parameters:
       global_frame: odom
       robot_base_frame: base_link
+      rolling_window: true
       width: 3
       height: 3
       resolution: 0.05
-      rolling_window: true
       plugins: ["inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 0.55
+      always_send_full_costmap: True
 
 map_saver:
   ros__parameters:

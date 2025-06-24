@@ -8,13 +8,14 @@ import argparse
 from datetime import datetime
 
 import rclpy
-from nav2_simple_commander.robot_navigator import BasicNavigator
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from ament_index_python.packages import get_package_share_directory
 
 from src.utils.gps_utils import latLonYaw2Geopose
 
 from geometry_msgs.msg import PoseStamped
 from robot_localization.srv import FromLL
+from nav_msgs.msg import Odometry
 
 # Visualization
 from nav_msgs.msg import Path
@@ -166,6 +167,18 @@ class GpsWpCommander:
         self.wp_parser  = YamlWaypointParser(wps_file_path)
         self.reverse    = reverse
 
+        # Odometry topic with ENU pose in map frame
+        self._last_odom_pose: PoseStamped | None = None
+        self.navigator.create_subscription(Odometry, "/fixposition/odometry_enu", self._odom_cb, 10)
+
+        # Parameters for the NavigateThroughPoses task
+        self.max_window    = 50.0   # meters (square side length)
+        self.safety_margin = 1.0    # meters (keep a little inside the edge)
+        self.max_seg_len   = 100.0  # meters of path length per sub-goal
+        self.radius        = self.max_window/2 - self.safety_margin   # ≈ 24 m
+        self.odom_timeout_s = 2.0   # wait this long for first /fixposition msg
+        self.max_retries = 1        # re-attempt each failed segment once
+
         # FromLL client (WGS-84 → map frame) – create it on the navigator node
         self._fromll_cli = self.navigator.create_client(FromLL, "/fromLL")
         self.navigator.get_logger().info("Waiting for /fromLL service…")
@@ -209,7 +222,10 @@ class GpsWpCommander:
         return pose
 
     def start_ntp(self):
-        """Send one NavigateThroughPoses goal and block until done."""
+        """Send *multiple* NavigateThroughPoses goals whenever the full list of
+        waypoints would not fit inside the rolling global cost-map. Each sub-goal 
+        is guaranteed to stay inside a radius *R* around the pose that was current 
+        when the sub-goal was dispatched."""
         self.navigator.waitUntilNav2Active(localizer="robot_localization")
 
         raw_wps = self.wp_parser.wps_dict["waypoints"]
@@ -223,13 +239,124 @@ class GpsWpCommander:
             poses.append(self._latlon_to_pose(
                 wp["latitude"], wp["longitude"], yaw))
 
-        self._publish_waypoints(poses)
-        self.navigator.goThroughPoses(poses)
+        seg_idx   = 0
+        remaining = poses
+        retries_left = self.max_retries
 
-        while not self.navigator.isTaskComplete():
-            rclpy.spin_once(self.navigator, timeout_sec=0.1)
+        while remaining:
+            # Current robot pose in map frame (start-of-segment centre)
+            try:
+                cur_pose = self._get_robot_pose()
+            except Exception as e:
+                self.navigator.get_logger().error(f"Failed to get robot pose: {e}")
+                return
+            cx, cy   = cur_pose.pose.position.x, cur_pose.pose.position.y
 
-        print("Waypoints completed successfully (continuous mode)")
+            # Build one segment whose every pose lies inside the radius R
+            segment      = []
+            cum_length   = 0.0       # running distance
+            prev_xy      = (cx, cy)  # start measuring from robot
+            
+            for p in remaining:
+                dx = p.pose.position.x - cx
+                dy = p.pose.position.y - cy
+
+                # Window test **in map axes** (square, not circle)
+                half_win = self.max_window/2 - self.safety_margin
+                inside_window = (abs(dx) <= half_win) and (abs(dy) <= half_win)
+
+                # Distance if we *would* append this pose
+                step          = math.hypot(p.pose.position.x - prev_xy[0],
+                                            p.pose.position.y - prev_xy[1])
+                inside_length = (cum_length + step) <= self.max_seg_len
+
+                if not (inside_window and inside_length):
+                    # Adding this pose would violate at least one rule
+                    if segment:                 # we already have a valid chunk
+                        break                   # finish the segment here
+                    else:
+                        # Even the *first* pose is out of bounds → force-split
+                        # so we can advance and recompute next time
+                        self.navigator.get_logger().warn(
+                            f"Pose {(p.pose.position.x, p.pose.position.y)} "
+                            "is out of the current 50x50 m window - "
+                            "sending it alone.")
+                        segment.append(p)
+                        break
+
+                # Safe to add
+                segment.append(p)
+                cum_length += step
+                prev_xy     = (p.pose.position.x, p.pose.position.y)
+
+            # Publish & send this segment
+            self._publish_waypoints(segment)
+            self.navigator.goThroughPoses(segment)
+
+            seg_idx += 1
+            self.navigator.get_logger().info(f"Segment {seg_idx}: {len(segment)} poses")
+
+            while not self.navigator.isTaskComplete():
+                rclpy.spin_once(self.navigator, timeout_sec=0.1)
+            
+            # Assess the result of the NavigateThroughPoses task
+            result = self.navigator.getResult()
+            
+            # Path successfully completed
+            if result == TaskResult.SUCCEEDED:
+                remaining    = remaining[len(segment):]
+                retries_left = self.max_retries
+                continue
+
+            # Otherwise: FAILED or CANCELED
+            self.navigator.get_logger().warn(
+                f"Segment {seg_idx} did not reach the goal (status={result}).")
+
+            if retries_left <= 0:
+                self.navigator.get_logger().error(
+                    "Exceeded retry budget — aborting mission.")
+                return
+
+            retries_left -= 1
+
+            # Re-insert the un-reached waypoints *and* a fresh “start-now” pose
+            try:
+                cur_pose = self._get_robot_pose()
+            except Exception as e:
+                self.navigator.get_logger().error(f"Cannot recover: {e}")
+                return
+
+            self.navigator.get_logger().info(
+                "Re-planning from current position…")
+
+            # Re-insert the current pose to start from it
+            remaining = [cur_pose] + segment + remaining[len(segment):]
+
+        print("Waypoints completed successfully (segmented mode)")
+        
+    def _odom_cb(self, msg: Odometry) -> None:
+        """Cache the most recent odometry pose as a `PoseStamped`."""
+        ps = PoseStamped()
+        ps.header = msg.header
+        ps.pose   = msg.pose.pose
+        self._last_odom_pose = ps
+
+    def _get_robot_pose(self) -> PoseStamped:
+        """
+        Return the most recent pose from /fixposition/odometry_enu.
+        Blocks (spins) until a message arrives or the timeout elapses.
+        """
+        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(
+            seconds=self.odom_timeout_s)
+
+        while self._last_odom_pose is None:
+            if self.navigator.get_clock().now() > deadline:
+                raise RuntimeError(
+                    f"No Odometry on /fixposition/odometry_enu "
+                    f"after {self.odom_timeout_s:.1f}s")
+            rclpy.spin_once(self.navigator, timeout_sec=0.05)
+
+        return self._last_odom_pose
         
     def _publish_waypoints(self, poses):
         # Path message
