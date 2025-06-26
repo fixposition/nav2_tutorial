@@ -23,6 +23,7 @@ import select
 import sys
 import termios
 import tty
+import math
 from datetime import datetime
 
 import rclpy
@@ -47,6 +48,10 @@ class GpsPeriodicLogger(Node):
         self.last_gps: NavSatFix | None = None
         self.last_yaw: float = 0.0
         self.saved_points: int = 0
+        
+        self._DIST_TOL_M   = 0.01       # Save only if moved ≥ 1 cm
+        self._DEG2M_LAT    = 110_574.0  # Rough conversion at mid-latitudes
+        self._last_saved_fix   : NavSatFix | None = None
 
         # ------------------------------------------------------------------
         # Topic subscriptions
@@ -88,12 +93,25 @@ class GpsPeriodicLogger(Node):
     # ------------------------------------------------------------------
     def _log_waypoint(self) -> None:
         """Append the current pose to YAML."""
-        if self.last_gps is None:
+        fix = self.last_gps
+        if fix is None:
             return  # wait for first fix
-
+        
         if self.saved_points == 0:
             # First time we succeed in logging – announce start of collection.
             self.get_logger().info("Started collecting waypoints …")
+        
+        if self._last_saved_fix is not None:
+            dlat = (fix.latitude  - self._last_saved_fix.latitude ) * self._DEG2M_LAT
+            # convert longitude degrees to metres at current latitude
+            lon_scale = 111_320.0 * math.cos(math.radians(fix.latitude))
+            dlon = (fix.longitude - self._last_saved_fix.longitude) * lon_scale
+            dist = math.hypot(dlat, dlon)
+            if dist < self._DIST_TOL_M:
+                return  # too close → skip this sample
+        
+        # Passed the distance test → remember it for next time
+        self._last_saved_fix = fix
 
         waypoint = {
             'latitude': self.last_gps.latitude,

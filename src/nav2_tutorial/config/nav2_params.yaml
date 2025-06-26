@@ -2,11 +2,15 @@
 bt_navigator:
   ros__parameters:
     global_frame: map
-    robot_base_frame: base_link
+    robot_base_frame: vrtk_link
     odom_topic: /odom
     bt_loop_duration: 10
     default_server_timeout: 20
-    transform_tolerance: 0.3
+    transform_tolerance: 0.2
+    failure_recovery_enabled: true
+    failure_recovery_spin_behavior: true
+    failure_recovery_clear_costmap: true
+    failure_recovery_max_attempts: 2
     navigators: ["navigate_to_pose", "navigate_through_poses"]
     navigate_to_pose:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
@@ -31,19 +35,19 @@ controller_server:
       required_movement_radius: 0.2
       movement_time_allowance: 20.0
     goal_checker:
-      plugin: "nav2_controller::SimpleGoalChecker"
+      plugin: "nav2_controller::StoppedGoalChecker"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
       stateful: True
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 1.3
+      desired_linear_vel: 0.8
       lookahead_dist: 1.0
       min_lookahead_dist: 0.2
       max_lookahead_dist: 2.0
       lookahead_time: 1.5
       rotate_to_heading_angular_vel: 1.0
-      transform_tolerance: 0.5
+      transform_tolerance: 0.2
       use_velocity_scaled_lookahead_dist: false
       min_approach_linear_velocity: 0.05
       approach_velocity_scaling_dist: 0.6
@@ -66,7 +70,7 @@ global_costmap:
   global_costmap:
     ros__parameters:
       global_frame: map
-      robot_base_frame: base_link
+      robot_base_frame: vrtk_link
       resolution: 0.05
       rolling_window: true
       width: 50
@@ -81,7 +85,7 @@ local_costmap:
   local_costmap:
     ros__parameters:
       global_frame: odom
-      robot_base_frame: base_link
+      robot_base_frame: vrtk_link
       rolling_window: true
       width: 3
       height: 3
@@ -138,8 +142,8 @@ behavior_server:
       plugin: "nav2_behaviors::AssistedTeleop"
     local_frame: odom
     global_frame: map
-    robot_base_frame: base_link
-    transform_tolerance: 0.5
+    robot_base_frame: vrtk_link
+    transform_tolerance: 0.2
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
     min_rotational_vel: 0.4

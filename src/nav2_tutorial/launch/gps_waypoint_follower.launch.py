@@ -41,9 +41,9 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(os.path.join(launch_dir, 'robot_description.launch.py'))
     )
 
-    robot_localization_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'dual_ekf_navsat.launch.py'))
-    )
+    # robot_localization_cmd = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(os.path.join(launch_dir, 'dual_ekf_navsat.launch.py'))
+    # )
 
     navigation2_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(launch_dir, "navigation.launch.py")),
@@ -74,23 +74,23 @@ def generate_launch_description():
 
     # Add actions
     ld.add_action(scout_cmd)
-    ld.add_action(robot_localization_cmd)
+    # ld.add_action(robot_localization_cmd)
     ld.add_action(navigation2_cmd)
     ld.add_action(rviz_cmd)
     ld.add_action(mapviz_cmd)
     
-    # Add the set_datum node
-    datum_node = TimerAction(
-        period=5.0,
-        actions=[
-            Node(
-                package="nav2_tutorial",
-                executable="set_datum",
-                name="set_datum",
-                output="screen"
-            )
-        ]
-    )
-    ld.add_action(datum_node)
+    # # Add the set_datum node
+    # datum_node = TimerAction(
+    #     period=5.0,
+    #     actions=[
+    #         Node(
+    #             package="nav2_tutorial",
+    #             executable="set_datum",
+    #             name="set_datum",
+    #             output="screen"
+    #         )
+    #     ]
+    # )
+    # ld.add_action(datum_node)
 
     return ld

@@ -28,6 +28,8 @@ setup(
         'console_scripts': [
             'logged_waypoint_follower = src.logged_waypoint_follower:main',
             'logged_smooth_follower = src.logged_smooth_follower:main',
+            'logged_refill_follower = src.logged_refill_follower:main',
+            'simple_follower = src.simple_follower:main',
             'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
             'gps_waypoint_logger = src.gps_waypoint_logger:main',
             'terminal_logger = src.terminal_logger:main',
