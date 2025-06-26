@@ -246,9 +246,10 @@ class GpsWpCommander:
         self._retries_left     = 1
         
         # Sliding-window parameters
+        # For long mission: seg_len_max = 9.0, advance_tol = 3.60, overlap_tol = 1.30
         self.seg_len_max      = 6.0    # m – length of window Nav2 sees
-        self.advance_tol      = 1.60   # m – when to roll the window forward
-        self.overlap_tol      = 0.30   # m – keep poses this close as overlap
+        self.advance_tol      = 2.60   # m – when to roll the window forward
+        self.overlap_tol      = 1.00   # m – keep poses this close as overlap
         self._fp_client = None
         
         # Statistics
@@ -343,6 +344,25 @@ class GpsWpCommander:
         # 2)  Prime the first window
         # ------------------------------------------------------------
         robot = self._get_robot_pose()
+
+        # Fast-forward to the first pose that is > 1 m away
+        start_skip_tol = 1.0                         # [m] change as needed
+        while remaining and self._dist(robot, remaining[0]) < start_skip_tol:
+            remaining.pop(0)
+            self._visited_wps += 1                   # we “virtually” visited it
+            
+        if self._visited_wps:
+            self.navigator.get_logger().info(
+                f"Pruned waypoints! Starting from {self._visited_wps} out of {self._total_wps} waypoints…")
+
+        # if everything was within the tolerance, we’re already done!
+        if not remaining:
+            self.navigator.get_logger().info("Trajectory already completed.")
+            return
+
+        window  = self._make_window(robot, remaining)
+
+        
         window = self._make_window(robot, remaining)        
         new_wps = len(window) - 1              # skip robot pose
         
@@ -369,63 +389,70 @@ class GpsWpCommander:
                 goal_handle = _get_goal_handle(self.navigator)      # may be None
                 current_id  = _get_current_uuid(self.navigator)
 
-                #–— If we can’t identify the result reliably, treat it as current –—
+                # If we can’t identify the result reliably, treat it as current
                 if goal_handle is None or current_id is None:
                     result_is_current = True
                 else:
                     result_id = UUID(bytes=goal_handle.goal_id.uuid)
                     result_is_current = (result_id == UUID(bytes=current_id))
 
-                #-----------------------------------------------------------
-                # 1)   *Stale* result from the goal we just pre-empted
-                #-----------------------------------------------------------
+                # *Stale* result from the goal we just pre-empted
                 if not result_is_current:
                     continue        # ignore and keep streaming
 
+                # Status handling
+                robot = self._get_robot_pose()     # live pose for all cases
+
                 #-----------------------------------------------------------
-                # 2)   Current goal SUCCEEDED
+                # 1)  SUCCEEDED      → accept only if really at tail *and*
+                #                      nothing remains in the global list
                 #-----------------------------------------------------------
                 if status == TaskResult.SUCCEEDED:
-                    if not remaining:                               # trajectory finished
+                    at_tail = (self._dist(robot, window[-1]) <= self.advance_tol)
+                    if at_tail and not remaining:
                         self.navigator.get_logger().info("Trajectory finished")
-                        break
+                        break        # all done
                     else:
-                        continue                                    # hand-off to next window
+                        # Success was premature → resend the unreached tail
+                        unreached = [p for p in window
+                                     if self._dist(robot, p) > self.advance_tol]
+                        if not unreached:
+                            # corner-case: we *are* at tail but still have
+                            # poses in ‘remaining’ → just continue, the normal
+                            # sliding-window logic will pick them up
+                            continue
+                        retry_window = [robot] + unreached
+                        self.navigator.get_logger().warn(
+                            f"Premature SUCCEEDED - retrying {len(unreached)} "
+                            f"poses of current segment")
+                        self._publish_waypoints(retry_window, seg_idx)   # same colour
+                        self.navigator.goThroughPoses(retry_window)
+                        window = retry_window             # keep tracking it
+                        continue                          # do **not** touch `remaining`
 
                 #-----------------------------------------------------------
-                # 3)   Current goal FAILED  → one retry
+                # 2)  FAILED or CANCELLED  → one retry
                 #-----------------------------------------------------------
-                if status == TaskResult.FAILED:
+                if status in (TaskResult.FAILED, TaskResult.CANCELED):
                     if self._retries_left > 0:
                         self._retries_left -= 1
-
-                        robot = self._get_robot_pose()
-
-                        # 1.  Walk forward inside the failed window until you
-                        #     reach the first pose that is *ahead* of the robot.
-                        remaining_in_window = []
-                        robot_found_tail = False
-                        for p in window:
-                            if robot_found_tail or self._dist(robot, p) > 1e-3:
-                                robot_found_tail = True
-                                remaining_in_window.append(p)
-
-                        # 2.  If nothing left → give up (unlikely but safe-guard)
-                        if not remaining_in_window:
+                        unreached = [p for p in window
+                                     if self._dist(robot, p) > self.advance_tol]
+                        if not unreached:
                             self.navigator.get_logger().error(
-                                "Retry requested but no poses remain in failed window")
+                                "Retry requested but no poses remain in window")
                             break
-
-                        # 3.  New window = [robot_pose] + the untouched tail
-                        retry_window = [robot] + remaining_in_window
-
+                        retry_window = [robot] + unreached
                         self.navigator.get_logger().warn(
-                            f"Segment {seg_idx+1} failed – retrying {len(remaining_in_window)} poses")
-                        self._publish_waypoints(retry_window, seg_idx)  # same seg-idx: overwrite colour
+                            f"Segment {seg_idx+1} {status.name.lower()} - "
+                            f"retrying {len(unreached)} poses")
+                        self._publish_waypoints(retry_window, seg_idx)
                         self.navigator.goThroughPoses(retry_window)
-                        continue      # <-- DO NOT modify `remaining` or `_visited_wps` here
+                        window = retry_window
+                        continue
                     else:
-                        self.navigator.get_logger().error("NavigateThroughPoses failed twice – aborting")
+                        self.navigator.get_logger().error(
+                            "Segment failed twice - aborting")
                         break
 
             # Live pose
