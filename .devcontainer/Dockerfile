@@ -29,6 +29,7 @@ RUN apt update && \
       can-utils \
       net-tools \
       python3-tk \
+      python3-pyproj \
       ros-jazzy-xacro \
       ros-jazzy-navigation2 \
       ros-jazzy-nav2-bringup \
