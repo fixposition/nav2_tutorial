@@ -1,11 +1,9 @@
 import os
 import sys
-import time
 import math
 import yaml
 import glob
 import argparse
-from datetime import datetime
 
 import rclpy
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
@@ -15,7 +13,7 @@ from src.utils.gps_utils import latLonYaw2Geopose
 from rclpy.action import ActionClient
 from rclpy.qos import qos_profile_sensor_data
 from uuid import UUID
-from pyproj import CRS, Transformer
+from pyproj import Transformer
 
 # ROS messages
 from sensor_msgs.msg import NavSatFix
@@ -237,19 +235,17 @@ class GpsWpCommander:
         self._tf_llh2enu = Transformer.from_pipeline(enu_pipeline)
 
         # Parameters for the NavigateThroughPoses task
-        self.max_window    = 50.0   # meters (square side length)
-        self.safety_margin = 1.0    # meters (keep a little inside the edge)
-        self.max_seg_len   = 100.0  # meters of path length per sub-goal
-        self.odom_timeout_s = 2.0   # wait this long for first /fixposition msg
-        self.max_retries = 1        # re-attempt each failed segment once
+        self.odom_timeout_s = 2.0    # wait this long for first /fixposition msg
+        self.max_retries    = 1      # re-attempt each failed segment once
+        self._retries_left  = self.max_retries
         self._last_goal_uuid: UUID | None = None
-        self._retries_left     = 1
         
         # Sliding-window parameters
         # For long mission: seg_len_max = 9.0, advance_tol = 3.60, overlap_tol = 1.30
-        self.seg_len_max      = 6.0    # m – length of window Nav2 sees
-        self.advance_tol      = 2.60   # m – when to roll the window forward
-        self.overlap_tol      = 1.00   # m – keep poses this close as overlap
+        self.seg_len_max      = 6.0   # m – length of window Nav2 sees
+        self.advance_tol      = 2.6   # m – when to roll the window forward
+        self.overlap_tol      = 1.0   # m – keep poses this close as overlap
+        self.start_seg_tol    = 3.0   # m – max distance we “snap” to the path
         self._fp_client = None
         
         # Statistics
@@ -345,15 +341,18 @@ class GpsWpCommander:
         # ------------------------------------------------------------
         robot = self._get_robot_pose()
 
-        # Fast-forward to the first pose that is > 1 m away
-        start_skip_tol = 1.0                         # [m] change as needed
-        while remaining and self._dist(robot, remaining[0]) < start_skip_tol:
-            remaining.pop(0)
-            self._visited_wps += 1                   # we “virtually” visited it
-            
-        if self._visited_wps:
+        # Fast-forward to the first pose within start_seg_tol
+        closest_idx = self._closest_wp_index(robot, remaining)
+        if self._dist(robot, remaining[closest_idx]) > self.start_seg_tol:
+            closest_idx = 0                    # fall back to the first wp
+
+        if closest_idx:
+            self._visited_wps += closest_idx   # statistics
+            skipped = closest_idx
+            remaining = remaining[closest_idx:]
             self.navigator.get_logger().info(
-                f"Pruned waypoints! Starting from {self._visited_wps} out of {self._total_wps} waypoints…")
+                f"Skipped {skipped} waypoint(s); "
+                f"starting with wp #{skipped+1}/{self._total_wps}")
 
         # if everything was within the tolerance, we’re already done!
         if not remaining:
@@ -361,19 +360,19 @@ class GpsWpCommander:
             return
 
         window  = self._make_window(robot, remaining)
-
+        if len(window) == 1:          # no waypoint fit inside seg_len_max
+            window.append(remaining[0])
+            new_wps = 1
+        else:
+            new_wps = len(window) - 1
         
-        window = self._make_window(robot, remaining)        
-        new_wps = len(window) - 1              # skip robot pose
-        
+        self._visited_wps += new_wps
         self._log_segment(window,
                           overlap_cnt=0,
-                          seg_idx    =seg_idx,
-                          new_wps    =new_wps)
+                          seg_idx    =seg_idx)
         self._publish_waypoints(window, seg_idx)
         self.navigator.goThroughPoses(window)
         
-        self._visited_wps += new_wps           # update tally *after* queueing
         remaining = remaining[new_wps:]
         seg_idx += 1
 
@@ -488,10 +487,10 @@ class GpsWpCommander:
             remaining = remaining[len(forward):]
             
             # log stats **before** we cancel / send
+            self._visited_wps += len(forward)   # advance tally
             self._log_segment(new_window,
                               overlap_cnt=len(overlap),
-                              seg_idx    =seg_idx,
-                              new_wps    =len(forward))
+                              seg_idx    =seg_idx)
 
             # # Pre-empt the running action
             # self.navigator.cancelTask()
@@ -528,7 +527,7 @@ class GpsWpCommander:
             
             self._publish_waypoints(new_window, seg_idx)
             self.navigator.goThroughPoses(new_window)
-            self._visited_wps += len(forward)   # advance tally
+            self._retries_left = self.max_retries
             seg_idx += 1
             window = new_window
         
@@ -556,7 +555,7 @@ class GpsWpCommander:
 
         return self._last_odom_pose
         
-    def _publish_waypoints(self, poses, seg_idx: int):
+    def _publish_waypoints(self, poses: list[PoseStamped], seg_idx: int):
         # Path message
         path = Path()
         path.header.frame_id = "map"
@@ -625,11 +624,10 @@ class GpsWpCommander:
 
     def _log_segment(self, window,
                      *, overlap_cnt: int,
-                     seg_idx: int,
-                     new_wps: int) -> None:
+                     seg_idx: int) -> None:
         seg_len  = self._segment_length(window)
         num_wps  = len(window)
-        progress = max(self._visited_wps - overlap_cnt, 0)
+        progress = self._visited_wps
 
         self.navigator.get_logger().info(
             f"Segment {seg_idx+1} length: {seg_len:0.2f} m, "
@@ -671,6 +669,14 @@ class GpsWpCommander:
 
         self.full_traj_mrk_pub.publish(MarkerArray(
             markers=[line] + dots.markers))
+        
+    def _closest_wp_index(self, robot: PoseStamped, poses: list[PoseStamped]) -> int:
+        d_min, idx_min = float("inf"), 0
+        for i, p in enumerate(poses):
+            d = self._dist(robot, p)
+            if d < d_min:
+                d_min, idx_min = d, i
+        return idx_min
 
 
 def main(argv: list[str] | None = None):
