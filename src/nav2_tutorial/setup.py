@@ -27,18 +27,17 @@ setup(
     entry_points={
         'console_scripts': [
             # GPS Waypoint Follower
-            'simple_follower = src.simple_follower:main',
-            'logged_smooth_follower = src.logged_smooth_follower:main',
-            'logged_waypoint_follower = src.logged_waypoint_follower:main',
-            'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
+            'smooth_wp_follower = src.smooth_wp_follower:main',
+            'precise_wp_follower = src.precise_wp_follower:main',
+            'interactive_wp_follower = src.interactive_wp_follower:main',
             
             # GPS Waypoint Logger
             'gps_keylogger = src.loggers.gps_keylogger:main',
             'gps_periodic_logger = src.loggers.gps_periodic_logger:main',
             
             # Datum Setter
-            'set_datum = src.set_datum:main',
-            'set_datum_from_tf = src.set_datum_from_tf:main',
+            'set_datum = src.utils.set_datum:main',
+            'set_datum_from_tf = src.utils.set_datum_from_tf:main',
         ],
     },
 )

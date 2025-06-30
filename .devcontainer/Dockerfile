@@ -29,6 +29,8 @@ RUN apt update && \
       can-utils \
       net-tools \
       python3-tk \
+      python3-matplotlib \
+      python3-geopandas \
       ros-jazzy-xacro \
       ros-jazzy-navigation2 \
       ros-jazzy-nav2-bringup \
