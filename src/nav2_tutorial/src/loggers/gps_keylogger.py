@@ -31,6 +31,8 @@ class GpsKeyLogger(Node):
         self.last_gps = None
         self.last_yaw = 0.0
         self.last_press_time = 0.0
+        self.waypoints = []
+        self.flush_threshold = 5
 
         self.gps_topic = '/fixposition/odometry_llh'
         self.odom_topic = '/fixposition/odometry_enu'
@@ -69,6 +71,24 @@ class GpsKeyLogger(Node):
             self.get_logger().warn("Received invalid GPS coordinates.")
             return
 
+        wp = {
+            'latitude':  self.last_gps.latitude,
+            'longitude': self.last_gps.longitude,
+            'altitude':  self.last_gps.altitude,
+            'yaw':       self.last_yaw,
+            'logged_at': datetime.now().isoformat()
+        }
+        self.waypoints.append(wp)
+
+        self.get_logger().info(
+            f"Logged waypoint #{len(self.waypoints)}: "
+            f"lat={wp['latitude']:.6f}, lon={wp['longitude']:.6f}, yaw={wp['yaw']:.2f}"
+        )
+
+        if len(self.waypoints) >= self.flush_threshold:
+            self.flush_waypoints_to_disk()
+
+    def flush_waypoints_to_disk(self) -> None:
         try:
             with open(self.logging_file_path, 'r') as f:
                 data = yaml.safe_load(f) or {}
@@ -79,15 +99,7 @@ class GpsKeyLogger(Node):
             return
 
         wps = data.get('waypoints', [])
-
-        wp = {
-            'latitude':  self.last_gps.latitude,
-            'longitude': self.last_gps.longitude,
-            'altitude':  self.last_gps.altitude,
-            'yaw':       self.last_yaw,
-            'logged_at': datetime.now().isoformat()
-        }
-        wps.append(wp)
+        wps.extend(self.waypoints)
         data['waypoints'] = wps
 
         tmp_path = f"{self.logging_file_path}.tmp"
@@ -95,14 +107,11 @@ class GpsKeyLogger(Node):
             with open(tmp_path, 'w') as f:
                 yaml.dump(data, f, default_flow_style=False)
             os.replace(tmp_path, self.logging_file_path)
+            self.get_logger().info(f"Flushed {len(self.waypoints)} waypoint(s) to disk.")
+            self.waypoints.clear()
         except Exception as e:
             self.get_logger().error(f"Failed to write log file: {e}")
-            return
 
-        self.get_logger().info(
-            f"Logged waypoint #{len(wps)}: "
-            f"lat={wp['latitude']:.6f}, lon={wp['longitude']:.6f}, yaw={wp['yaw']:.2f}"
-        )
 
 def stdin_ready():
     return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
@@ -135,7 +144,7 @@ def main(argv=None):
             if stdin_ready():
                 now = time.time()
                 c = sys.stdin.read(1)
-                if c == 'f' and (now - node.last_press_time > 0.5):
+                if c == 'f' and (now - node.last_press_time > 0.2):
                     node.last_press_time = now
                     node.log_waypoint()
                 elif c == 'q':
@@ -144,6 +153,9 @@ def main(argv=None):
     except KeyboardInterrupt:
         node.get_logger().info("Interrupted by user, shutting down.")
     finally:
+        if node.waypoints:
+            node.get_logger().info("Saving remaining waypoints before exit...")
+            node.flush_waypoints_to_disk()
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
         rclpy.shutdown()
 

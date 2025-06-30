@@ -33,8 +33,8 @@ setup(
             'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
             
             # GPS Waypoint Logger
-            'terminal_logger = src.loggers.terminal_logger:main',
-            'periodic_logger = src.loggers.periodic_logger:main',
+            'gps_keylogger = src.loggers.gps_keylogger:main',
+            'gps_periodic_logger = src.loggers.gps_periodic_logger:main',
             
             # Datum Setter
             'set_datum = src.set_datum:main',

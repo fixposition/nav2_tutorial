@@ -137,21 +137,93 @@ source /opt/ros/jazzy/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-## Step 5: Log GNSS waypoints
-The user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
-```
-ros2 run nav2_tutorial gps_waypoint_logger <optional: /path/to/file>
+# 🧭 GPS Waypoint Loggers for ROS 2
+
+This package provides two ROS 2 nodes for recording GPS waypoints to a YAML file, based on GNSS and odometry data:
+
+| Script                   | Logging Mode         | Trigger        | Ideal Use Case                  |
+| ------------------------ | -------------------- | -------------- | ------------------------------- |
+| `gps_keylogger.py`       | Manual               | Keyboard `'f'` | Sparse or event-based recording |
+| `gps_periodic_logger.py` | Automated (periodic) | Time interval  | Continuous route logging        |
+
+---
+
+## 🧰 Topics Subscribed
+
+Both scripts subscribe to:
+
+* `/fixposition/odometry_llh` — `sensor_msgs/NavSatFix`
+* `/fixposition/odometry_enu` — `nav_msgs/Odometry`
+
+---
+
+## 🗺 Waypoint Format
+
+Logged waypoints are stored in a YAML file under the `waypoints:` key. Each entry includes:
+
+```yaml
+waypoints:
+  - latitude: 47.123456
+    longitude: 8.654321
+    altitude: 520.4
+    yaw: 1.57
+    logged_at: "2025-06-30T15:47:12.003918"
 ```
 
-If your terminal does not support X11 forwarding, you can use the following script:
-```
-ros2 run nav2_tutorial terminal_logger <optional: /path/to/file>
+---
+
+## 🚀 How to Use
+
+### Manual Logger (`gps_keylogger.py`)
+
+```bash
+ros2 run nav2_tutorial gps_keylogger.py [optional_output.yaml]
 ```
 
-Lastly, you can use a periodic logger to have denser points:
+* Press `'f'` to log a waypoint
+* Press `'q'` to quit and save
+
+Waypoints are saved immediately and safely to disk.
+
+---
+
+### Periodic Logger (`gps_periodic_logger.py`)
+
+```bash
+ros2 run nav2_tutorial gps_periodic_logger.py [optional_output.yaml] -i 0.2
 ```
-ros2 run nav2_tutorial periodic_logger <optional: /path/to/file>
+
+* Logs waypoints automatically every 0.2s (default)
+* Press `'q'` to stop recording
+* Uses buffered writing to reduce I/O overhead
+* Filters out insignificant movement (less than 1 cm).
+
+---
+
+## 📦 Output Location
+
+If no output path is specified, the log will be written to:
 ```
+nav2_tutorial/src/nav2_tutorial/trajectories/gps_waypoints_<timestamp>.yaml
+```
+
+## 📈 Visualizing Logged Trajectories
+
+To quickly visualize GPS waypoint logs, use the `visualize_gps_yaml.py` script:
+
+### Example:
+```bash
+python3 visualize_gps_yaml.py path/to/gps_waypoints.yaml         # simple 2D plot
+python3 visualize_gps_yaml.py path/to/gps_waypoints.yaml --map   # map overlay (if supported)
+```
+
+### Requirements for Map Overlay:
+- `geopandas`
+- `contextily`
+- `shapely`
+
+This will display your trajectory as a line over OpenStreetMap tiles (Mapnik style) using Web Mercator projection.
+
 
 
 ## Step 6: Start GPS Waypoint Following
