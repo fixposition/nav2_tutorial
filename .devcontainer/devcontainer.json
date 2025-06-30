@@ -2,7 +2,7 @@
 {
   "name": "ROS2 Dev Container",
   "dockerComposeFile": ["../.devcontainer/docker-compose.yaml"],
-  "service": "app",
+  "service": "vrtk",
   "workspaceFolder": "/home/dev/ros_ws",
   "extensions": [
     "ms-python.python",

@@ -1,5 +1,7 @@
-services:
-  app:
+version: '3.8'
+
+services:  
+  vrtk:
     build:
       context: .
       dockerfile: Dockerfile
@@ -8,22 +10,31 @@ services:
         USER_ID: "${HOST_UID}"
         GROUP_ID: "${HOST_GID}"
         BASE_IMAGE: "ros:jazzy-perception"
-    container_name: ros2_dev_container
+    container_name: ros2_vrtk_container
     volumes:
       - ..:/home/dev/ros_ws
-      - /tmp/.X11-unix:/tmp/.X11-unix  # Mount X11 socket
+      - /tmp/.X11-unix:/tmp/.X11-unix
     working_dir: /home/dev/ros_ws
+    network_mode: host
     environment:
-      - DISPLAY=${DISPLAY}  # Pass the DISPLAY variable
-    #   - NVIDIA_VISIBLE_DEVICES=all
-    #   - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+      - DISPLAY=${DISPLAY}
+    restart: always
     stdin_open: true
     tty: true
-    network_mode: "host"
+    entrypoint:
+      - bash
+      - -lc
+      - |
+          set -e
+
+          # source ROS
+          source /opt/ros/jazzy/setup.bash
+
+          # ensure the workspace is built or latest build is sourced
+          colcon build --cmake-args -DBUILD_TESTING=OFF
+
+          # source the workspace
+          source install/setup.bash
+
+          # launch everything in one go
+          exec ros2 launch nav2_tutorial all_nodes.launch.py

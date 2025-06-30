@@ -4,7 +4,7 @@
         # - Serial (<device>:<baudrate>)
         # stream: serial:///dev/ttyUSB0:115200
         # - TCP client (<ip_address>:<port>)
-        stream: tcpcli://10.0.2.1:21000
+        stream: tcpcli://10.1.1.2:21000
         # Wait time in [s] to attempt reconnecting after connection lost
         reconnect_delay: 5.0
         # Delay warning threshold [s]. Note that this only works if your system time is synced to the VRTK2. This must be a float.

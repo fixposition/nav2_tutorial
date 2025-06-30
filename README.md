@@ -15,19 +15,25 @@ The following ROS packages are required for this project:
 3. Fixposition Nav2 Tutorial ([nav2_tutorial](https://github.com/fixposition/nav2_tutorial.git))
 
 To obtain them, simply execute the following command at the root of the repository:
-```
+```bash
 git submodule update --init --recursive
 ```
 
 
 ### (Optional) Docker container
 The user can also compile the provided Docker container in the .devcontainer folder to test this tutorial. To achieve this, the following commands can be used:
-```
+```bash
 docker compose -f .devcontainer/docker-compose.yaml build
 docker compose -f .devcontainer/docker-compose.yaml up -d
-docker exec -it ros2_dev_container bash
+docker compose -f ~/dev/nav2_tutorial/.devcontainer/docker-compose.yaml exec vrtk bash
 ```
 Alternatively, the user can compile it directly using the Dev Containers extension in VSCode.
+
+To check the status of the different services, you can run the following commands:
+```bash
+docker compose logs vrtk
+```
+
 
 ## Step 2: Set up Fixposition ROS Driver
 
@@ -61,16 +67,17 @@ converter:
     use_z: false               # Transmit the z axis of the input velocity
 ```
 
+
 ## Step 3: Build ROS2 workspace
 Build the ROS2 workspace.
-```
+```bash
 source /opt/ros/jazzy/setup.bash
 colcon build --cmake-args -DBUILD_TESTING=OFF
 ```
 
 
 ## Step 4: Source built packages
-```
+```bash
 source install/setup.bash
 ```
 
@@ -80,18 +87,19 @@ source install/setup.bash
 ### Establish connection with the Scout robot
 To communicate with the Scout robot, you must use the provided USB-to-CAN adapter. Then, run the following commands to start the connection:
 
-```
+```bash
 sudo modprobe gs_usb can-utils
 sudo ip link set can0 up type can bitrate 500000
 candump can0
 ```
+
 Alternatively, the user can also directly execute the provided script start_can.sh:
-```
+```bash
 sudo ./scripts/start_can.sh
 ```
 
 Example output from the can0 port:
-```
+```bash
 can0 311 [8] 00 00 25 C6 FF FF F0 A4
 can0 251 [8] 00 00 00 00 00 00 00 00
 can0 252 [8] 00 00 00 00 00 00 00 00
@@ -103,53 +111,150 @@ can0 311 [8] 00 00 25 C6 FF FF F0 A4
 ...
 ```
 
+Note: To automatically establish the connection to the Agilex, you can edit the /etc/modules file as such:
+```bash
+# /etc/modules: kernel modules to load at boot time.
+gs_usb
+can-utils
+```
+
+In addition, in case the error messsage 'RTNETLINK answers: Device or resource busy' appears, please run the following command:
+```bash
+sudo ip link set can0 down
+```
+
 ### Control the Scout robot using the keyboard
 
 In terminal 1, run these commands to start the base node for the Scout robot:
-```
+```bash
 source /opt/ros/jazzy/setup.bash && source install/setup.bash
 ros2 launch scout_base scout_mini_base.launch.py
 ```
 
 In terminal 2, run these commands to start the keyboard-based controller:
-```
+```bash
 source /opt/ros/jazzy/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-## Step 6: Start GPS Waypoint Following
-Launch the ROS nodes in the following order:
+# 🧭 GPS Waypoint Loggers for ROS 2
+
+This package provides two ROS 2 nodes for recording GPS waypoints to a YAML file, based on GNSS and odometry data:
+
+| Script                   | Logging Mode         | Trigger        | Ideal Use Case                  |
+| ------------------------ | -------------------- | -------------- | ------------------------------- |
+| `gps_keylogger.py`       | Manual               | Keyboard `'f'` | Sparse or event-based recording |
+| `gps_periodic_logger.py` | Automated (periodic) | Time interval  | Continuous route logging        |
+
+---
+
+## 🧰 Topics Subscribed
+
+Both scripts subscribe to:
+
+* `/fixposition/odometry_llh` — `sensor_msgs/NavSatFix`
+* `/fixposition/odometry_enu` — `nav_msgs/Odometry`
+
+---
+
+## 🗺 Waypoint Format
+
+Logged waypoints are stored in a YAML file under the `waypoints:` key. Each entry includes:
+
+```yaml
+waypoints:
+  - latitude: 47.123456
+    longitude: 8.654321
+    altitude: 520.4
+    yaw: 1.57
+    logged_at: "2025-06-30T15:47:12.003918"
 ```
+
+---
+
+## 🚀 How to Use
+
+### Manual Logger (`gps_keylogger.py`)
+
+```bash
+ros2 run nav2_tutorial gps_keylogger.py [optional_output.yaml]
+```
+
+* Press `'f'` to log a waypoint
+* Press `'q'` to quit and save
+
+Waypoints are saved immediately and safely to disk.
+
+---
+
+### Periodic Logger (`gps_periodic_logger.py`)
+
+```bash
+ros2 run nav2_tutorial gps_periodic_logger.py [optional_output.yaml] -i 0.2
+```
+
+* Logs waypoints automatically every 0.2s (default)
+* Press `'q'` to stop recording
+* Uses buffered writing to reduce I/O overhead
+* Filters out insignificant movement (less than 1 cm).
+
+---
+
+## 📦 Output Location
+
+If no output path is specified, the log will be written to:
+```
+nav2_tutorial/src/nav2_tutorial/trajectories/gps_waypoints_<timestamp>.yaml
+```
+
+## 📈 Visualizing Logged Trajectories
+
+To quickly visualize GPS waypoint logs, use the `visualize_gps_yaml.py` script:
+
+### Example:
+```bash
+python3 utils/visualize_gps_yaml.py path/to/gps_waypoints.yaml         # simple 2D plot
+python3 utils/visualize_gps_yaml.py path/to/gps_waypoints.yaml --map   # map overlay (if supported)
+```
+
+### Requirements for Map Overlay:
+- `geopandas`
+- `contextily`
+- `shapely`
+
+This will display your trajectory as a line over OpenStreetMap tiles (Mapnik style) using Web Mercator projection.
+
+
+
+# GPS Waypoint Follower
+Launch the ROS nodes in the following order:
+```bash
 ros2 launch scout_base scout_mini_base.launch.py
 ros2 launch nav2_tutorial fp_driver_node.launch config:=fp_driver_config.yaml
 ros2 launch nav2_tutorial gps_waypoint_follower.launch.py
 ```
+Note: You can use the `all_nodes.launch.py` file to achieve this. For navigation, this repository provides three waypoint following methods: Precise, Smooth, and Interactive. We can only choose one method each time we execute it.
 
-For launching the graphical interface, you can run the following command (note that this only works on x86/amd64 devices):
-```
-ros2 launch nav2_tutorial mapviz.launch.py
+* Precise GPS Waypoint Follower
+The `precise_wp_follower` script streams all the logged points from a YAML file and makes the robot follow them point-by-point, stopping at every waypoint when the accuracy threshold is met.
+```bash
+ros2 run nav2_tutorial precise_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
 ```
 
-Finally, start the navigation. There are two types waypoint following methods. We can only choose one method each time we execute it.
+* Smooth GPS Waypoint Follower
+The `smooth_wp_follower` script streams all the logged points from a YAML file and divides them in segments, pre-computing a smooth trajectory for the robot to follow. This ensure constant speed throughout the waypoint following task.
+```bash
+ros2 run nav2_tutorial smooth_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
+```
 
 * Interactive GPS Waypoint Follower
-```
-ros2 run nav2_tutorial interactive_waypoint_follower
-```
-
-* Logged GPS Waypoint Follower
-
-First, the user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
-```
-ros2 run nav2_tutorial gps_waypoint_logger /path/to/file
+The `interactive_wp_follower` script listens to the mapviz topic for the next waypoint objective.
+```bash
+ros2 run nav2_tutorial interactive_wp_follower
 ```
 
-If your terminal does not support X11 forwarding, you can use the following script:
+For launching the graphical interface, you can run the following command (note that this only works on x86/amd64 devices):
+```bash
+ros2 launch nav2_tutorial mapviz.launch.py
 ```
-ros2 run nav2_tutorial terminal_logger
-```
-
-Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints.
-```
-ros2 run nav2_tutorial logged_waypoint_follower /path/to/file
-```
+Or alternatively use the `--mapviz` flag on the `gps_waypoint_follower.launch.py` script.

@@ -1,6 +1,6 @@
-from setuptools import find_packages, setup
 import os
 from glob import glob
+from setuptools import find_packages, setup
 
 package_name = 'nav2_tutorial'
 
@@ -14,22 +14,30 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch*')),
         (os.path.join('share', package_name, 'config'), glob('config/*')),
+        (os.path.join('share', package_name, 'trajectories'), glob('trajectories/*')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Facundo Garcia',
     maintainer_email='facundo.garcia@fixposition.com',
-    description='GPS Waypoints Follower for AgileX Scout Mini',
+    description='GPS Waypoint Follower for Vision-RTK2',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'logged_waypoint_follower = src.logged_waypoint_follower:main',
-            'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
-            'gps_waypoint_logger = src.gps_waypoint_logger:main',
-            'terminal_logger = src.terminal_logger:main',
-            'set_datum = src.set_datum:main'
+            # GPS Waypoint Follower
+            'smooth_wp_follower = src.smooth_wp_follower:main',
+            'precise_wp_follower = src.precise_wp_follower:main',
+            'interactive_wp_follower = src.interactive_wp_follower:main',
+            
+            # GPS Waypoint Logger
+            'gps_keylogger = src.loggers.gps_keylogger:main',
+            'gps_periodic_logger = src.loggers.gps_periodic_logger:main',
+            
+            # Datum Setter
+            'set_datum = src.utils.set_datum:main',
+            'set_datum_from_tf = src.utils.set_datum_from_tf:main',
         ],
     },
 )

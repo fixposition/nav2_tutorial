@@ -29,11 +29,14 @@ RUN apt update && \
       can-utils \
       net-tools \
       python3-tk \
+      python3-matplotlib \
+      python3-geopandas \
       python3-pyproj \
       ros-jazzy-xacro \
       ros-jazzy-navigation2 \
       ros-jazzy-nav2-bringup \
       ros-jazzy-teleop-twist-keyboard \
+      ros-jazzy-launch-xml \
       sudo && \
     \
     # Detect device architecture.
@@ -71,8 +74,9 @@ RUN echo "alias ls='ls --color=auto'" >> /etc/bash.bashrc && \
 # Switch to the new "dev" user.
 USER ${USER_NAME}
 
-# Add the ROS environment setup to the dev user's .bashrc.
-RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/${USER_NAME}/.bashrc
+# Make interactive shells auto-source ROS and ROS workspace
+RUN echo 'source /opt/ros/jazzy/setup.bash'    >> ~/.bashrc \
+ && echo 'source ~/ros_ws/install/setup.bash'  >> ~/.bashrc
 
 # Ensure the user's local bin is in PATH.
 ENV PATH=/home/${USER_NAME}/.local/bin:${PATH}

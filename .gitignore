@@ -3,6 +3,9 @@ log/
 build/
 install/
 
+# Ignore saved trajectories
+src/nav2_tutorial/trajectories/gps_waypoints_*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
