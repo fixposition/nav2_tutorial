@@ -1,6 +1,6 @@
-from setuptools import find_packages, setup
 import os
 from glob import glob
+from setuptools import find_packages, setup
 
 package_name = 'nav2_tutorial'
 
@@ -21,20 +21,24 @@ setup(
     zip_safe=True,
     maintainer='Facundo Garcia',
     maintainer_email='facundo.garcia@fixposition.com',
-    description='GPS Waypoints Follower for AgileX Scout Mini',
+    description='GPS Waypoint Follower for Vision-RTK2',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'logged_waypoint_follower = src.logged_waypoint_follower:main',
-            'logged_smooth_follower = src.logged_smooth_follower:main',
-            'logged_refill_follower = src.logged_refill_follower:main',
+            # GPS Waypoint Follower
             'simple_follower = src.simple_follower:main',
+            'logged_smooth_follower = src.logged_smooth_follower:main',
+            'logged_waypoint_follower = src.logged_waypoint_follower:main',
             'interactive_waypoint_follower = src.interactive_waypoint_follower:main',
-            'gps_waypoint_logger = src.gps_waypoint_logger:main',
-            'terminal_logger = src.terminal_logger:main',
-            'periodic_logger = src.periodic_logger:main',
-            'set_datum = src.set_datum:main'
+            
+            # GPS Waypoint Logger
+            'terminal_logger = src.loggers.terminal_logger:main',
+            'periodic_logger = src.loggers.periodic_logger:main',
+            
+            # Datum Setter
+            'set_datum = src.set_datum:main',
+            'set_datum_from_tf = src.set_datum_from_tf:main',
         ],
     },
 )

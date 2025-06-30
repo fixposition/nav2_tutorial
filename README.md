@@ -137,6 +137,23 @@ source /opt/ros/jazzy/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
+## Step 5: Log GNSS waypoints
+The user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
+```
+ros2 run nav2_tutorial gps_waypoint_logger <optional: /path/to/file>
+```
+
+If your terminal does not support X11 forwarding, you can use the following script:
+```
+ros2 run nav2_tutorial terminal_logger <optional: /path/to/file>
+```
+
+Lastly, you can use a periodic logger to have denser points:
+```
+ros2 run nav2_tutorial periodic_logger <optional: /path/to/file>
+```
+
+
 ## Step 6: Start GPS Waypoint Following
 Launch the ROS nodes in the following order:
 ```
@@ -157,22 +174,7 @@ Finally, start the navigation. There are two types waypoint following methods. W
 ros2 run nav2_tutorial interactive_waypoint_follower
 ```
 
-* Logged GPS Waypoint Follower
 
-First, the user must populate the predefined gps_waypoints.yaml file with the waypoints the robot has to follow. The user can either provide the waypoints manually or use the provided waypoint logging tool as shown below:
-```
-ros2 run nav2_tutorial gps_waypoint_logger <optional: /path/to/file>
-```
-
-If your terminal does not support X11 forwarding, you can use the following script:
-```
-ros2 run nav2_tutorial terminal_logger
-```
-
-Lastly, you can use a periodic logger to have denser points:
-```
-ros2 run nav2_tutorial periodic_logger
-```
 
 Then, call the logged_waypoint_follower script to make the robot follow the logged waypoints:
 ```
