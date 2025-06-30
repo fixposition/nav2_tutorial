@@ -3,19 +3,18 @@ import argparse
 import yaml
 import matplotlib.pyplot as plt
 import contextlib
+import os
 
 # Optional map overlay
 with contextlib.suppress(ImportError):
     import contextily as ctx
-
 
 def load_waypoints(yaml_path):
     with open(yaml_path, 'r') as f:
         data = yaml.safe_load(f)
     return data.get('waypoints', [])
 
-
-def plot_waypoints(waypoints, use_map=False):
+def plot_waypoints(waypoints, output_path, use_map=False):
     if not waypoints:
         print("No waypoints found.")
         return
@@ -37,7 +36,6 @@ def plot_waypoints(waypoints, use_map=False):
             import geopandas as gpd
             from shapely.geometry import Point
 
-            # Convert to GeoDataFrame and plot with contextily
             gdf = gpd.GeoDataFrame(
                 geometry=[Point(lon, lat) for lon, lat in zip(lons, lats)],
                 crs="EPSG:4326"
@@ -49,8 +47,8 @@ def plot_waypoints(waypoints, use_map=False):
             print("Map overlay requires 'geopandas' and 'contextily'. Falling back to plain plot.")
 
     plt.tight_layout()
-    plt.show()
-
+    plt.savefig(output_path)
+    print(f"Saved plot to: {output_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Visualize GPS waypoints from YAML")
@@ -59,8 +57,9 @@ def main():
     args = parser.parse_args()
 
     waypoints = load_waypoints(args.yaml_file)
-    plot_waypoints(waypoints, use_map=args.map)
-
+    base_path, _ = os.path.splitext(args.yaml_file)
+    output_path = base_path + ".png"
+    plot_waypoints(waypoints, output_path, use_map=args.map)
 
 if __name__ == "__main__":
     main()
