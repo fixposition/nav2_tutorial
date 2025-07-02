@@ -7,6 +7,7 @@ import math
 import time
 import yaml
 import select
+import signal
 import termios
 import argparse
 from datetime import datetime
@@ -20,6 +21,8 @@ from ament_index_python.packages import get_package_share_directory
 
 from src.utils.gps_utils import euler_from_quaternion
 
+# Global variables
+stop_requested = False
 
 class GpsPeriodicLogger(Node):
     def __init__(self, logging_file_path: str, interval: float):
@@ -140,6 +143,10 @@ def _parse_arguments(argv: list[str] | None = None) -> tuple[str, float]:
 def _stdin_ready() -> bool:
     return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
 
+def handle_sigterm(signum, frame):
+    global stop_requested
+    stop_requested = True
+
 def main(argv: list[str] | None = None) -> None:
     yaml_path, interval = _parse_arguments(argv)
 
@@ -150,8 +157,12 @@ def main(argv: list[str] | None = None) -> None:
     old_settings = termios.tcgetattr(fd)
     tty.setcbreak(fd)
 
+    global stop_requested
+    stop_requested = False
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
     try:
-        while rclpy.ok():
+        while rclpy.ok() and not stop_requested:
             rclpy.spin_once(node, timeout_sec=0.1)
             if _stdin_ready():
                 ch = sys.stdin.read(1)
@@ -166,7 +177,6 @@ def main(argv: list[str] | None = None) -> None:
             node.flush_to_disk()
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
