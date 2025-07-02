@@ -64,6 +64,54 @@ def get_live_log():
             log_buffer.pop(0)
     return ''.join(log_buffer)
 
+# --- Follower process management ---
+follower_process = None
+follower_thread = None
+follower_log_queue = queue.Queue()
+follower_log_buffer = []
+FOLLOWER_LOG_BUFFER_MAX_LINES = 100
+follower_running = threading.Event()
+
+def run_follower_process(cmd):
+    global follower_process
+    follower_running.set()
+    follower_process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
+    try:
+        for line in follower_process.stdout:
+            follower_log_queue.put(line)
+    except Exception as e:
+        follower_log_queue.put(f"[Follower error]: {e}\n")
+    follower_running.clear()
+
+def start_follower(cmd):
+    global follower_thread, follower_running
+    if follower_running.is_set():
+        follower_log_queue.put("[Follower already running]\n")
+        return
+    follower_thread = threading.Thread(target=run_follower_process, args=(cmd,), daemon=True)
+    follower_thread.start()
+
+def stop_follower():
+    global follower_process, follower_running
+    if follower_process and follower_running.is_set():
+        follower_process.terminate()
+        follower_running.clear()
+        follower_log_queue.put("[Follower stopped]\n")
+
+def get_follower_live_log():
+    while not follower_log_queue.empty():
+        line = follower_log_queue.get()
+        follower_log_buffer.append(line)
+        if len(follower_log_buffer) > FOLLOWER_LOG_BUFFER_MAX_LINES:
+            follower_log_buffer.pop(0)
+    return ''.join(follower_log_buffer)
+
 # ----- App Layout -----
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -99,11 +147,17 @@ app.layout = dbc.Container([
                 inputStyle={"margin-right": "8px", "margin-left": "16px"}
             ),
             dbc.Button("Play Trajectory", id="play-btn", color="primary", style={"width": "100%", "margin-top": "10px"}),
+            # Optional: add a Stop Follower button if you want to manually interrupt followers
+            # dbc.Button("Stop Follower", id="stop-follower-btn", color="danger", style={"width": "100%", "margin-top": "10px"}),
             html.Div(id="status", style={"margin-top": "20px"}),
             html.Hr(),
             html.H5("Live Logger Output"),
-            html.Pre(id='live-log', style={'height': '300px', 'overflow': 'auto', 'background': '#1a1a1a', 'color': '#22ee22'}),
+            html.Pre(id='live-log', style={'height': '200px', 'overflow': 'auto', 'background': '#1a1a1a', 'color': '#22ee22'}),
             dcc.Interval(id='log-interval', interval=1000, n_intervals=0),
+            html.Hr(),
+            html.H5("Live Follower Output"),
+            html.Pre(id='live-follower-log', style={'height': '200px', 'overflow': 'auto', 'background': '#222222', 'color': '#ffd700'}),
+            dcc.Interval(id='follower-log-interval', interval=1000, n_intervals=0),
         ], width=9),
     ]),
     # Hidden stores for state
@@ -157,7 +211,7 @@ def toggle_reverse(n, is_reverse):
     style = {"display": "inline-block", "margin-bottom": "10px"} if is_reverse else {"display": "none"}
     return is_reverse, style
 
-# Play trajectory logic
+# Play trajectory logic (launches the follower and streams output)
 @app.callback(
     Output("status", "children", allow_duplicate=True),
     Input("play-btn", "n_clicks"),
@@ -194,7 +248,7 @@ def play_trajectory(n, mode, dropdown_value, using_last, reverse):
         cmd.append("--reverse")
 
     try:
-        subprocess.Popen(cmd)
+        start_follower(cmd)
         mode_label = {"precise": "Precise", "smooth": "Smooth", "interactive": "Interactive"}[mode]
         details = f"Playing {traj_display} in {mode_label} mode"
         if reverse:
@@ -234,6 +288,14 @@ def stop_recording(n):
 )
 def update_log(_):
     return get_live_log()
+
+# Live follower output
+@app.callback(
+    Output('live-follower-log', 'children'),
+    Input('follower-log-interval', 'n_intervals')
+)
+def update_follower_log(_):
+    return get_follower_live_log()
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8051)
