@@ -258,3 +258,7 @@ For launching the graphical interface, you can run the following command (note t
 ros2 launch nav2_tutorial mapviz.launch.py
 ```
 Or alternatively use the `--mapviz` flag on the `gps_waypoint_follower.launch.py` script.
+
+
+# Debugging trajectories
+To analyze the trajectories performed by the robot and determine if any issues have occured, the user can perform a recording of all topics by running `ros2 bag record --all`. Then, launch RViz2 with the provided configuration file to easily visualize the debug topics containing the waypoint coordinates, the global and local plans, the costmaps, among other things: `ros2 run rviz2 rviz2 -d /home/dev/ros_ws/src/nav2_tutorial/config/nav2_plan_viz.rviz`.
