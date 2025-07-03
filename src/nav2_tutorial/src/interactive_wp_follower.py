@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from nav2_simple_commander.robot_navigator import BasicNavigator
 from geometry_msgs.msg import PointStamped
-from .utils.gps_utils import latLonYaw2Geopose
+from src.utils.gps_utils import latLonYaw2Geopose
 
 
 class InteractiveGpsWpCommander(Node):

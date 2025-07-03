@@ -14,7 +14,8 @@ TRAJECTORY_DIR = '/home/dev/ros_ws/src/nav2_tutorial/trajectories'
 RECORD_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/loggers/gps_periodic_logger.py'
 PRECISE_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/precise_wp_follower.py'
 SMOOTH_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/smooth_wp_follower.py'
-INTERACTIVE_SCRIPT = '/home/jetson/dev/nav2_tutorial/src/nav2_tutorial/src/interactive_wp_follower.py'
+INTERACTIVE_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/interactive_wp_follower.py'
+CLICKED_SCRIPT = "/home/dev/ros_ws/src/nav2_tutorial/src/dashboard/send_clicked_point.py"
 
 def get_trajectories():
     return sorted(glob.glob(os.path.join(TRAJECTORY_DIR, '*.yaml')))
@@ -58,11 +59,18 @@ def run_process(cmd, process_type):
         process_log_queue.put(f"[Process error]: {e}\n")
     process_running.clear()
 
+def clear_process_log():
+    global process_log_buffer, process_log_queue
+    process_log_buffer.clear()
+    while not process_log_queue.empty():
+        process_log_queue.get()
+
 def start_process(cmd, process_type):
     global process_thread, process_running
     if process_running.is_set():
         process_log_queue.put("[A process is already running]\n")
         return
+    clear_process_log()
     process_thread = threading.Thread(target=run_process, args=(cmd, process_type), daemon=True)
     process_thread.start()
 
@@ -147,6 +155,8 @@ app.layout = dbc.Container([
     ]),
     dcc.Store(id="using-last-store", data=False),
     dcc.Store(id="reverse-store", data=False),
+    dcc.Store(id="clicked-point", data=None),
+    dcc.Store(id="mode-store", data="precise"),
 ])
 
 # ----- CALLBACKS -----
@@ -157,8 +167,10 @@ app.layout = dbc.Container([
     Input("trajectory-dropdown", "value"),
     Input("using-last-store", "data"),
     Input("show-orientation", "value"),
+    Input("clicked-point", "data"),
+    State("mode-store", "data"),
 )
-def update_trajectory_map(selected_file, using_last, show_orientation):
+def update_trajectory_map(selected_file, using_last, show_orientation, clicked_point, mode):
     if using_last or selected_file == "USING_LAST":
         files = get_trajectories()
         if not files:
@@ -207,6 +219,21 @@ def update_trajectory_map(selected_file, using_last, show_orientation):
             "line": {"width": 2, "color": "orange"},
             "name": "Yaw",
             "showlegend": False
+        })
+    # Visualize clicked point if in interactive mode and point exists
+    if mode == "interactive" and clicked_point and "lat" in clicked_point and "lon" in clicked_point:
+        data.append({
+            "type": "scattermapbox",
+            "lat": [clicked_point["lat"]],
+            "lon": [clicked_point["lon"]],
+            "mode": "markers",
+            "marker": {
+                "size": 16,
+                "color": "green",
+                "opacity": 1.0,
+                "symbol": "circle"
+            },
+            "name": "Clicked Goal"
         })
     return {
         "data": data,
@@ -337,6 +364,36 @@ def stop_process_callback(n):
 )
 def update_live_output(_):
     return get_combined_live_log()
+
+@app.callback(
+    Output("mode-store", "data"),
+    Input("mode-radio", "value"),
+)
+def update_mode_store(selected_mode):
+    return selected_mode
+
+# Point navigation
+def send_point_to_ros(lat, lon):
+    subprocess.Popen(["python3", CLICKED_SCRIPT, str(lat), str(lon)])
+
+@app.callback(
+    Output("clicked-point", "data"),
+    Output("status", "children", allow_duplicate=True),
+    Input("trajectory-map", "clickData"),
+    State("mode-store", "data"),
+    prevent_initial_call=True
+)
+def handle_map_click(clickData, current_mode):
+    if current_mode != "interactive":
+        # Ignore clicks unless in Interactive mode
+        return dash.no_update, dash.no_update
+    if clickData and "points" in clickData:
+        lat = clickData["points"][0]["lat"]
+        lon = clickData["points"][0]["lon"]
+        send_point_to_ros(lat, lon)
+        return {"lat": lat, "lon": lon}, dbc.Alert(f"Sent goal: lat={lat:.6f}, lon={lon:.6f}", color="info")
+    return dash.no_update, dash.no_update
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8055)
