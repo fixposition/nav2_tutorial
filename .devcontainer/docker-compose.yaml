@@ -27,6 +27,9 @@ services:
       - |
           set -e
 
+          # source virtual environment
+          source /home/dev/nav2_env/bin/activate
+
           # source ROS
           source /opt/ros/jazzy/setup.bash
 

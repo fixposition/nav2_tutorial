@@ -1,0 +1,8 @@
+numpy
+pyyaml
+tk
+matplotlib
+geopandas
+pyproj
+dash
+dash-bootstrap-components
