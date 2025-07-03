@@ -8,6 +8,7 @@ import threading
 import queue
 import yaml
 import math
+import numpy as np
 
 # ----- Constants -----
 TRAJECTORY_DIR = '/home/dev/ros_ws/src/nav2_tutorial/trajectories'
@@ -192,7 +193,8 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
             "data": [],
             "layout": {"title": "No waypoints in file", "height": 500}
         }
-    # Trajectory line
+
+    # Trajectory data
     data = [{
         "type": "scattermapbox",
         "lat": lats,
@@ -202,7 +204,8 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
         "line": {"width": 2, "color": "blue"},
         "name": "Trajectory"
     }]
-    # Orientation arrows
+
+    # Add orientation arrows if requested
     if show_orientation:
         arrow_scale = 0.000009
         arrow_lats, arrow_lons = [], []
@@ -220,6 +223,36 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
             "name": "Yaw",
             "showlegend": False
         })
+
+    # Dense click grid (interactive only)
+    if mode == "interactive":
+        # Use the mean of the loaded trajectory as the center, or first point if only one exists
+        if len(lats) > 1 and len(lons) > 1:
+            lat_center, lon_center = sum(lats)/len(lats), sum(lons)/len(lons)
+        else:
+            lat_center, lon_center = lats[0], lons[0]
+        grid_lat, grid_lon = generate_click_grid(
+            lat_center=lat_center,
+            lon_center=lon_center,
+            lat_range=0.0003,   # Adjust as needed (≈32m at mid latitudes)
+            lon_range=0.0005,    # ≈40m
+            n=60                # 40x40 = 1600 clickable points
+        )
+        data.append({
+            "type": "scattermapbox",
+            "lat": grid_lat,
+            "lon": grid_lon,
+            "mode": "markers",
+            "marker": {
+                "size": 11,
+                "color": "blue",
+                "opacity": 0.3,
+                "symbol": "circle",
+            },
+            "name": "ClickGrid",
+            "hoverinfo": "none",
+        })
+
     # Visualize clicked point if in interactive mode and point exists
     if mode == "interactive" and clicked_point and "lat" in clicked_point and "lon" in clicked_point:
         data.append({
@@ -228,26 +261,28 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
             "lon": [clicked_point["lon"]],
             "mode": "markers",
             "marker": {
-                "size": 16,
+                "size": 18,
                 "color": "green",
                 "opacity": 1.0,
                 "symbol": "circle"
             },
             "name": "Clicked Goal"
         })
+
     return {
         "data": data,
         "layout": {
             "mapbox": {
                 "style": "open-street-map",
                 "center": {"lat": lats[0], "lon": lons[0]},
-                "zoom": 17,
+                "zoom": 18,
             },
             "margin": {"l": 0, "r": 0, "t": 30, "b": 0},
             "title": os.path.basename(yaml_path),
             "height": 500,
         }
     }
+
 
 # "Use Last" and dropdown management
 @app.callback(
@@ -373,6 +408,12 @@ def update_mode_store(selected_mode):
     return selected_mode
 
 # Point navigation
+def generate_click_grid(lat_center, lon_center, lat_range=0.002, lon_range=0.003, n=40):
+    lats = np.linspace(lat_center - lat_range, lat_center + lat_range, n)
+    lons = np.linspace(lon_center - lon_range, lon_center + lon_range, n)
+    grid_lats, grid_lons = np.meshgrid(lats, lons)
+    return grid_lats.flatten(), grid_lons.flatten()
+
 def send_point_to_ros(lat, lon):
     subprocess.Popen(["python3", CLICKED_SCRIPT, str(lat), str(lon)])
 
