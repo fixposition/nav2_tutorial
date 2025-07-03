@@ -98,8 +98,11 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dcc.Graph(id="trajectory-map", style={"height": "520px", "margin-bottom": "8px"}),
-            dbc.Checkbox(id="show-orientation", value=False, className="mb-2", style={"margin-left": "2px"}),
-            html.Label("Show orientation", htmlFor="show-orientation", style={"margin-left": "25px", "font-size": "90%"}),
+            html.Div([
+                    dbc.Checkbox(id="show-orientation", className="me-2"),
+                    html.Label("Show orientation", htmlFor="show-orientation", style={"margin-bottom": "0", "font-size": "95%"})
+                ], style={"display": "flex", "align-items": "center", "margin-bottom": "15px", "margin-left": "8px"}
+            ),
         ], width=12),
     ], style={"margin-bottom": "10px"}),
     dbc.Row([
@@ -117,21 +120,23 @@ app.layout = dbc.Container([
             dbc.Badge("Reverse", id="reverse-indicator", color="warning", pill=True, style={"display": "none", "margin-bottom": "10px"}),
         ], width=3),
         dbc.Col([
-            html.H4("Action"),
-            dbc.RadioItems(
-                id="mode-radio",
-                options=[
-                    {"label": "Precise", "value": "precise"},
-                    {"label": "Smooth", "value": "smooth"},
-                    {"label": "Interactive", "value": "interactive"},
-                ],
-                value="precise",
-                inline=True,
-                inputStyle={"margin-right": "8px", "margin-left": "16px"}
-            ),
-            dbc.Button("Play Trajectory", id="play-btn", color="primary", style={"width": "100%", "margin-top": "10px"}),
-            dbc.Button("Record Trajectory", id="record-btn", color="success", style={"width": "100%", "margin-top": "10px"}),
-            dbc.Button("Stop Process", id="stop-process-btn", color="danger", style={"width": "100%", "margin-top": "10px"}),
+            html.H4("Actions"),
+            html.Div([
+                dbc.RadioItems(
+                    id="mode-radio",
+                    options=[
+                        {"label": "Precise", "value": "precise"},
+                        {"label": "Smooth", "value": "smooth"},
+                        {"label": "Interactive", "value": "interactive"},
+                    ],
+                    value="precise",
+                    inline=False,  # vertical layout, no shifting
+                    style={"margin-bottom": "12px"},
+                ),
+            ], style={"margin-bottom": "20px"}),
+            dbc.Button("Play Trajectory", id="play-btn", color="primary", style={"width": "100%", "margin-bottom": "12px"}),
+            dbc.Button("Record Trajectory", id="record-btn", color="success", style={"width": "100%", "margin-bottom": "12px"}),
+            dbc.Button("Stop Process", id="stop-process-btn", color="danger", style={"width": "100%", "margin-bottom": "12px"}),
             html.Div(id="status", style={"margin-top": "20px"}),
         ], width=3),
         dbc.Col([
