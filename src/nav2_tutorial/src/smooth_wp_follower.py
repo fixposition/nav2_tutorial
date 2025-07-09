@@ -10,8 +10,7 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from rclpy.action import ActionClient
 from rclpy.qos import qos_profile_sensor_data
 from uuid import UUID
-from pyproj import Transformer
-from src.utils.gps_utils import quaternion_from_euler
+from src.utils.nav_utils import _hsv_to_rgb, _get_goal_handle, _get_current_uuid
 from src.utils.parser_utils import YamlWaypointParser, _latest_file, _resolve_ws_paths, _select_yaml
 
 # ROS messages
@@ -28,71 +27,27 @@ from rclpy.qos import QoSProfile, DurabilityPolicy
 MARKER_VIZ = True
 
 
-def _hsv_to_rgb(h, s=1.0, v=1.0):
-    """HSV to RGB converter."""
-    i = int(h*6.0) % 6
-    f = h*6.0 - i
-    p, q, t = v*(1-s), v*(1-f*s), v*(1-(1-f)*s)
-    if   i == 0: r,g,b = v,t,p
-    elif i == 1: r,g,b = q,v,p
-    elif i == 2: r,g,b = p,v,t
-    elif i == 3: r,g,b = p,q,v
-    elif i == 4: r,g,b = t,p,v
-    else:        r,g,b = v,p,q
-    return r, g, b
-
-
-def _get_goal_handle(nav):
-    """Return the ActionGoal handle of the latest NavigateThroughPoses goal."""
-    for attr in ("_ntp_goal_handle",               # Iron, Jazzy
-                 "_nav_through_poses_goal_handle"  # Humble, Galactic
-                ):
-        if hasattr(nav, attr):
-            return getattr(nav, attr)
-    return None
-
-def _get_current_uuid(nav):
-    """Return the UUID (bytes) of the goal that is currently active."""
-    for attr in ("_current_nav_through_poses_uuid",  # Humble
-                 "_current_ntp_uuid"                 # Iron/Jazzy
-                ):
-        if hasattr(nav, attr):
-            return getattr(nav, attr)
-    return None
-
-
 class GpsWpCommander:
     """Follow a smooth sequence of GPS waypoints."""
 
     def __init__(self, wps_file_path: str, reverse: bool = False, num_loop: int = 1):
         self.navigator  = BasicNavigator("basic_navigator")
-        self.wp_parser  = YamlWaypointParser(wps_file_path)
         self.reverse    = reverse
+        self.num_loop   = num_loop
 
         # Odometry topic with ENU pose in map frame
         self._last_odom_pose: PoseStamped | None = None
         self.navigator.create_subscription(Odometry, "/fixposition/odometry_enu", self._odom_cb, 10)
         
-        # Get datum
-        _base_lat, _base_lon, _base_alt = self._get_datum()
-        
-        # Transform from WGS-84 (lat, lon, h) to ENU (e, n, u) in the map frame
-        enu_pipeline = (
-            "+proj=pipeline "
-            "+step +proj=unitconvert +xy_in=deg +xy_out=rad "
-            "+step +proj=axisswap +order=2,1,3 "  # lon,lat order
-            "+step +proj=cart +ellps=WGS84 "
-            f"+step +proj=topocentric +ellps=WGS84 "
-            f"      +lat_0={_base_lat} +lon_0={_base_lon} +h_0={_base_alt} "
-        )
-        self._tf_llh2enu = Transformer.from_pipeline(enu_pipeline)
+        # Initialize waypoint parser
+        base_lat, base_lon, base_alt = self._get_datum()
+        self.wp_parser  = YamlWaypointParser(wps_file_path, base_lat, base_lon, base_alt)
 
-        # Parameters for the NavigateThroughPoses task
+        # Parameters for the GoThroughPoses task
         self.odom_timeout_s = 2.0  # wait this long for first /fixposition msg
         self.max_retries    = 1    # re-attempt each failed segment once
         self._retries_left  = self.max_retries
         self._last_goal_uuid: UUID | None = None
-        self.num_loop = num_loop
         
         # Sliding-window parameters
         # For long mission: seg_len_max = 9.0, advance_tol = 3.60, overlap_tol = 1.30
@@ -150,30 +105,13 @@ class GpsWpCommander:
         self.navigator.destroy_subscription(sub)
         return tuple(datum)
 
-    def _latlon_to_pose(self, lat: float, lon: float, yaw: float) -> PoseStamped:
-        """Convert latitude, longitude, and yaw to a PoseStamped in the map frame."""
-        x, y, _ = self._tf_llh2enu.transform(lat, lon, 0.0)
-        pose = PoseStamped()
-        pose.header.frame_id = "map"
-        pose.header.stamp    = rclpy.time.Time().to_msg()
-        pose.pose.position.x = x
-        pose.pose.position.y = y
-        pose.pose.position.z = 0.0
-        pose.pose.orientation = quaternion_from_euler(0.0, 0.0, yaw)
-        return pose
-
     def start_ntp(self):
-        """Start the NavigateThroughPoses task with the waypoints."""
+        """Start the GoThroughPoses task with the waypoints."""
         # Wait for the robot_localization node to be active
         self.navigator.waitUntilNav2Active(localizer="robot_localization")
 
         # Convert the whole YAML path once
-        all_poses = [
-            self._latlon_to_pose(wp["latitude"], wp["longitude"],
-                                self.wp_parser._reverse_yaw(wp["yaw"]) if self.reverse else wp["yaw"])
-            for wp in (self.wp_parser.wps_dict["waypoints"][::-1] if self.reverse else
-                    self.wp_parser.wps_dict["waypoints"])
-        ]
+        all_poses = self.wp_parser.get_wps(reverse=self.reverse)
         
         # Publish the full trajectory for visualization
         self._publish_full_traj(all_poses)
@@ -222,8 +160,8 @@ class GpsWpCommander:
             
             self._visited_wps += new_wps
             self._log_segment(window,
-                            overlap_cnt=0,
-                            seg_idx    =seg_idx)
+                              overlap_cnt = 0,
+                              seg_idx     = seg_idx)
             self._publish_waypoints(window, seg_idx)
             self.navigator.goThroughPoses(window)
             
@@ -335,8 +273,8 @@ class GpsWpCommander:
                 # Log stats before cancel / send goal
                 self._visited_wps += len(forward)
                 self._log_segment(new_window,
-                                overlap_cnt=len(overlap),
-                                seg_idx    =seg_idx)
+                                  overlap_cnt = len(overlap),
+                                  seg_idx     = seg_idx)
 
                 # # Pre-empt the running action
                 # self.navigator.cancelTask()
@@ -399,6 +337,57 @@ class GpsWpCommander:
 
         return self._last_odom_pose
         
+    def _dist(self, a: PoseStamped, b: PoseStamped) -> float:
+        """Return the Euclidean distance between two PoseStamped messages."""
+        dx, dy = a.pose.position.x - b.pose.position.x, a.pose.position.y - b.pose.position.y
+        return math.hypot(dx, dy)
+    
+    def _path_length(self, poses: list[PoseStamped]) -> float:
+        """Return the total length of the path defined by the poses."""
+        return sum(self._dist(a, b) for a, b in zip(poses[:-1], poses[1:]))
+
+    def _make_window(self, start: PoseStamped, todo: list[PoseStamped]) -> list[PoseStamped]:
+        """Return [start] + as many todo-poses as fit within seg_len_max."""
+        window  = [start]
+        length  = 0.0
+        prev_xy = (start.pose.position.x, start.pose.position.y)
+
+        for p in todo:
+            step = math.hypot(p.pose.position.x - prev_xy[0],
+                            p.pose.position.y - prev_xy[1])
+            if length + step > self.seg_len_max:
+                break
+            window.append(p)
+            length, prev_xy = length + step, (p.pose.position.x, p.pose.position.y)
+        return window
+    
+    def _segment_length(self, poses: list[PoseStamped]) -> float:
+        """Return the length of the segment defined by the poses."""
+        return sum(self._dist(a, b) for a, b in zip(poses[:-1], poses[1:]))
+    
+    def _closest_wp_index(self, robot: PoseStamped, poses: list[PoseStamped]) -> int:
+        """Compute the index of the closest waypoint to the robot."""
+        d_min, idx_min = float("inf"), 0
+        for i, p in enumerate(poses):
+            d = self._dist(robot, p)
+            if d < d_min:
+                d_min, idx_min = d, i
+        return idx_min
+
+    def _log_segment(self, window,
+                     *, overlap_cnt: int,
+                     seg_idx: int) -> None:
+        """Log the segment statistics."""
+        seg_len  = self._segment_length(window)
+        num_wps  = len(window)
+        progress = self._visited_wps
+
+        self.navigator.get_logger().info(
+            f"Segment {seg_idx+1} length: {seg_len:0.2f} m, "
+            f"Num. waypoints: {num_wps}, "
+            f"Overlap: {overlap_cnt}, "
+            f"Progress: {progress}/{self._total_wps}")
+    
     def _publish_waypoints(self, poses: list[PoseStamped], seg_idx: int):
         """Publish the current segment as a Path and MarkerArray."""
         # Path message
@@ -440,49 +429,7 @@ class GpsWpCommander:
             m.color.r, m.color.g, m.color.b, m.color.a = r, g, b, 1.0
             markers.markers.append(m)
         self.waypoint_marker_pub.publish(markers)
-        
-    def _dist(self, a: PoseStamped, b: PoseStamped) -> float:
-        """Return the Euclidean distance between two PoseStamped messages."""
-        dx, dy = a.pose.position.x - b.pose.position.x, a.pose.position.y - b.pose.position.y
-        return math.hypot(dx, dy)
     
-    def _path_length(self, poses: list[PoseStamped]) -> float:
-        """Return the total length of the path defined by the poses."""
-        return sum(self._dist(a, b) for a, b in zip(poses[:-1], poses[1:]))
-
-    def _make_window(self, start: PoseStamped, todo: list[PoseStamped]) -> list[PoseStamped]:
-        """Return [start] + as many todo-poses as fit within seg_len_max."""
-        window  = [start]
-        length  = 0.0
-        prev_xy = (start.pose.position.x, start.pose.position.y)
-
-        for p in todo:
-            step = math.hypot(p.pose.position.x - prev_xy[0],
-                            p.pose.position.y - prev_xy[1])
-            if length + step > self.seg_len_max:
-                break
-            window.append(p)
-            length, prev_xy = length + step, (p.pose.position.x, p.pose.position.y)
-        return window
-    
-    def _segment_length(self, poses: list[PoseStamped]) -> float:
-        """Return the length of the segment defined by the poses."""
-        return sum(self._dist(a, b) for a, b in zip(poses[:-1], poses[1:]))
-
-    def _log_segment(self, window,
-                     *, overlap_cnt: int,
-                     seg_idx: int) -> None:
-        """Log the segment statistics."""
-        seg_len  = self._segment_length(window)
-        num_wps  = len(window)
-        progress = self._visited_wps
-
-        self.navigator.get_logger().info(
-            f"Segment {seg_idx+1} length: {seg_len:0.2f} m, "
-            f"Num. waypoints: {num_wps}, "
-            f"Overlap: {overlap_cnt}, "
-            f"Progress: {progress}/{self._total_wps}")
-        
     def _publish_full_traj(self, poses: list[PoseStamped]):
         """Publish the whole trajectory as a latched Path + MarkerArray."""
         path = Path()
@@ -517,15 +464,6 @@ class GpsWpCommander:
 
         self.full_traj_mrk_pub.publish(MarkerArray(
             markers=[line] + dots.markers))
-        
-    def _closest_wp_index(self, robot: PoseStamped, poses: list[PoseStamped]) -> int:
-        """Compute the index of the closest waypoint to the robot."""
-        d_min, idx_min = float("inf"), 0
-        for i, p in enumerate(poses):
-            d = self._dist(robot, p)
-            if d < d_min:
-                d_min, idx_min = d, i
-        return idx_min
 
 
 def main(argv: list[str] | None = None):

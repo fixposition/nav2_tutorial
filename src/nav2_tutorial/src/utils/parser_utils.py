@@ -1,16 +1,32 @@
 import os
+import copy
 import glob
 import yaml
+import rclpy
 import argparse
+from pyproj import Transformer
 from typing import List, Tuple
-from src.utils.gps_utils import latLonYaw2Geopose
+from geometry_msgs.msg import PoseStamped
+from src.utils.gps_utils import quaternion_from_euler, latLonYaw2Geopose
 from ament_index_python.packages import get_package_share_directory
 
 
 class YamlWaypointParser:
     """Parse a set of GPS waypoints from a YAML file."""
 
-    def __init__(self, wps_file_path: str):
+    def __init__(self, wps_file_path: str, base_lat: float = 0.0,
+                 base_lon: float = 0.0, base_alt: float = 0.0):
+        """Initialize the parser with a YAML file path and base coordinates.
+        Args:
+            wps_file_path (str): Path to the YAML file containing waypoints.
+            base_lat (float): Latitude of the base point for ENU transformation.
+            base_lon (float): Longitude of the base point for ENU transformation.
+            base_alt (float): Altitude of the base point for ENU transformation.
+        Raises:
+            FileNotFoundError: If the specified YAML file does not exist.
+            KeyError: If the 'waypoints' key is missing in the YAML file.
+            RuntimeError: If the YAML file cannot be parsed.
+        """
         if not os.path.isfile(wps_file_path):
             raise FileNotFoundError(wps_file_path)
 
@@ -22,6 +38,27 @@ class YamlWaypointParser:
 
         if "waypoints" not in self.wps_dict:
             raise KeyError(f"Key 'waypoints' missing from YAML file '{wps_file_path}'.")
+        
+        # Raise warning if base coordinates are not set
+        if base_lat == 0.0 and base_lon == 0.0 and base_alt == 0.0:
+            print("Warning: Base coordinates are set to (0.0, 0.0, 0.0). "
+                  "This may lead to incorrect ENU transformations. "
+                  "Please set appropriate base coordinates for your map frame.")
+        
+        # Transform from WGS-84 (lat, lon, h) to ENU (e, n, u) in the map frame
+        self._update_base(base_lat, base_lon, base_alt)
+        
+    def _update_base(self, base_lat: float, base_lon: float, base_alt: float):
+        """Update the ENU transformation base point."""
+        enu_pipeline = (
+            "+proj=pipeline "
+            "+step +proj=unitconvert +xy_in=deg +xy_out=rad "
+            "+step +proj=axisswap +order=2,1,3 "  # lon,lat order
+            "+step +proj=cart +ellps=WGS84 "
+            f"+step +proj=topocentric +ellps=WGS84 "
+            f"      +lat_0={base_lat} +lon_0={base_lon} +h_0={base_alt} "
+        )
+        self._tf_llh2enu = Transformer.from_pipeline(enu_pipeline)
 
     @staticmethod
     def _reverse_yaw(yaw: float) -> float:
@@ -41,20 +78,37 @@ class YamlWaypointParser:
             if abs(dx) > 1e-8 or abs(dy) > 1e-8:   # ~1 cm in lat/lon
                 cleaned.append(wp)
         return cleaned
+    
+    def _latlon_to_pose(self, lat: float, lon: float, yaw: float) -> PoseStamped:
+        """Convert latitude, longitude, and yaw to a PoseStamped in the map frame."""
+        x, y, _ = self._tf_llh2enu.transform(lat, lon, 0.0)
+        pose = PoseStamped()
+        pose.header.frame_id = "map"
+        pose.header.stamp    = rclpy.time.Time().to_msg()
+        pose.pose.position.x = x
+        pose.pose.position.y = y
+        pose.pose.position.z = 0.0
+        pose.pose.orientation = quaternion_from_euler(0.0, 0.0, yaw)
+        return pose
 
     def get_wps(self, reverse: bool = False) -> List[dict]:
-        """Return a list of ``GeoPose`` objects, possibly in reverse order."""
-        waypoints = self.wps_dict["waypoints"][::-1] if reverse else self.wps_dict["waypoints"]
+        """Return a list of waypoints as PoseStamped objects.
+        Args:
+            reverse (bool): If True, reverse the order of waypoints.
+        Returns:
+            List[dict]: A list of waypoints as PoseStamped objects.
+        """
+        # Extract waypoints from the loaded YAML dictionary
+        waypoints = copy.deepcopy(self.wps_dict["waypoints"])
+        if reverse:
+            waypoints.reverse()
+            for wp in waypoints:
+                wp["yaw"] = self._reverse_yaw(wp["yaw"])
+            
+        # Filter out duplicate waypoints
         waypoints = self._dedup(waypoints)
         
-        
-        
-        
-        geopose_wps = []
-        for wp in waypoints:
-            yaw = self._reverse_yaw(wp["yaw"]) if reverse else wp["yaw"]
-            geopose_wps.append(latLonYaw2Geopose(wp["latitude"], wp["longitude"], yaw))
-        return geopose_wps
+        return [self._latlon_to_pose(wp["latitude"], wp["longitude"], wp["yaw"]) for wp in waypoints]
 
 
 def _latest_file(directory: str, pattern: str = "gps_waypoints_2*.yaml") -> str | None:
