@@ -1,179 +1,131 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import glob
+import math
 import os
 import sys
-import time
-import math
 import yaml
-import glob
-import argparse
-from datetime import datetime
+from typing import List, Tuple
 
 import rclpy
-from nav2_simple_commander.robot_navigator import BasicNavigator
 from ament_index_python.packages import get_package_share_directory
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
+from pyproj import Transformer
+from src.utils.gps_utils import quaternion_from_euler
+from src.utils.parser_utils import YamlWaypointParser, _latest_file, _resolve_ws_paths, _select_yaml
 
-from src.utils.gps_utils import latLonYaw2Geopose
-
-
-def _latest_file(directory: str, pattern: str = "gps_waypoints_2*.yaml") -> str | None:
-    """Return the lexically newest file matching *pattern* inside *directory*.
-
-    The files produced by *terminal_logger.py* embed a timestamp in their name
-    (e.g. ``gps_waypoints_20250317_142311.yaml``) so lexical order ===
-    chronological order. If *directory* does not exist or contains no matching
-    files, ``None`` is returned.
-    """
-    if not os.path.isdir(directory):
-        return None
-    files = glob.glob(os.path.join(directory, pattern))
-    if not files:
-        return None
-    files.sort()
-    return files[-1]
-
-
-def _resolve_ws_paths() -> tuple[str, str]:
-    """Return ``(src_traj_dir, share_traj_dir)`` for *nav2_tutorial*.
-
-    *share_traj_dir* is the directory installed by ``ament`` (typically
-    ``install/share/nav2_tutorial/trajectories``) while *src_traj_dir* points to
-    the editable source tree (``<ws_root>/src/nav2_tutorial/trajectories``).
-    """
-    share_dir = get_package_share_directory("nav2_tutorial")
-    share_traj_dir = os.path.join(share_dir, "trajectories")
-
-    # share/nav2_tutorial -> share -> install -> <ws_root>
-    ws_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(share_dir))))
-    src_traj_dir = os.path.join(ws_root, "src", "nav2_tutorial", "trajectories")
-    return src_traj_dir, share_traj_dir
-
-
-def _select_yaml(args: argparse.Namespace) -> str:
-    """Figure out which YAML file we should load.
-
-    Priority:
-    1. If the user passed an explicit path, use it.
-    2. If ``--last`` was requested, compare the newest file from the *src* and
-       *share* directories and choose the newer one (with a preference for the
-       *src* file if both have identical timestamps).
-    3. Otherwise, attempt to load ``gps_waypoints.yaml`` from *src* first then
-       *share*.
-
-    A *FileNotFoundError* is raised if no suitable file is found so that the
-    caller can decide how to handle the error.
-    """
-    src_traj_dir, share_traj_dir = _resolve_ws_paths()
-
-    # 1) Explicit path
-    if args.yaml_file is not None:
-        explicit = os.path.expanduser(args.yaml_file)
-        if not os.path.isfile(explicit):
-            raise FileNotFoundError(explicit)
-        return explicit
-
-    # 2) --last flag
-    if args.last:
-        src_latest = _latest_file(src_traj_dir)
-        share_latest = _latest_file(share_traj_dir)
-
-        if src_latest and share_latest:
-            # Compare by timestamp embedded in filename (lexical order) or mtime
-            chosen = src_latest if os.path.basename(src_latest) > os.path.basename(share_latest) else share_latest
-        else:
-            chosen = src_latest or share_latest  # whichever is not None (could still be None)
-
-        if chosen is None:
-            raise FileNotFoundError(f"No waypoint files matching 'gps_waypoints_2*.yaml' found in '{src_traj_dir}' or '{share_traj_dir}'.")
-        return chosen
-
-    # 3) Default lookup "gps_waypoints.yaml"
-    default_name = "gps_waypoints.yaml"
-    candidate_src = os.path.join(src_traj_dir, default_name)
-    if os.path.isfile(candidate_src):
-        return candidate_src
-
-    candidate_share = os.path.join(share_traj_dir, default_name)
-    if os.path.isfile(candidate_share):
-        return candidate_share
-
-    raise FileNotFoundError(f"Default waypoint file '{default_name}' not found in '{src_traj_dir}' or '{share_traj_dir}'.")
-
-
-class YamlWaypointParser:
-    """Parse a set of GPS waypoints from a YAML file."""
-
-    def __init__(self, wps_file_path: str):
-        if not os.path.isfile(wps_file_path):
-            raise FileNotFoundError(wps_file_path)
-
-        try:
-            with open(wps_file_path, "r") as wps_file:
-                self.wps_dict = yaml.safe_load(wps_file) or {}
-        except yaml.YAMLError as err:
-            raise RuntimeError(f"Failed to parse YAML file '{wps_file_path}': {err}")
-
-        if "waypoints" not in self.wps_dict:
-            raise KeyError(f"Key 'waypoints' missing from YAML file '{wps_file_path}'.")
-
-    @staticmethod
-    def _reverse_yaw(yaw: float) -> float:
-        """Return yaw rotated by π, wrapped to [-π, π]."""
-        new_yaw = yaw + math.pi
-        # Wrap to [-π, π]
-        return (new_yaw + math.pi) % (2 * math.pi) - math.pi
-
-    def get_wps(self, reverse: bool = False):
-        """Return a list of ``GeoPose`` objects, possibly in reverse order."""
-        waypoints = self.wps_dict["waypoints"][::-1] if reverse else self.wps_dict["waypoints"]
-        gepose_wps = []
-        for wp in waypoints:
-            yaw = self._reverse_yaw(wp["yaw"]) if reverse else wp["yaw"]
-            gepose_wps.append(latLonYaw2Geopose(wp["latitude"], wp["longitude"], yaw))
-        return gepose_wps
+# ROS msgs
+from sensor_msgs.msg import NavSatFix
+from geometry_msgs.msg import PoseStamped
+from rclpy.qos import qos_profile_sensor_data
 
 
 class GpsWpCommander:
-    """Use the Nav2 *GPS Waypoint Follower* to follow a set of waypoints."""
-
-    def __init__(self, wps_file_path: str, reverse: bool = False):
+    def __init__(self, yaml_path: str, *, reverse: bool = False):
         self.navigator = BasicNavigator("basic_navigator")
-        self.wp_parser = YamlWaypointParser(wps_file_path)
-        self.reverse = reverse
+        self.wps       = YamlWaypointParser(yaml_path).get_wps(reverse=reverse)
+        if not self.wps:
+            raise RuntimeError("Waypoint list is empty.")
 
-    def start_wpf(self):
-        """Block until all waypoints have been reached."""
+        # Build ENU transformer ---------------------------------------
+        base_lat, base_lon, base_alt = self._get_datum()
+        enu_pipeline = (
+            "+proj=pipeline "
+            "+step +proj=unitconvert +xy_in=deg +xy_out=rad "
+            "+step +proj=axisswap +order=2,1,3 "
+            "+step +proj=cart +ellps=WGS84 "
+            f"+step +proj=topocentric +ellps=WGS84 +lat_0={base_lat} +lon_0={base_lon} +h_0={base_alt} "
+        )
+        self._tf_llh2enu = Transformer.from_pipeline(enu_pipeline)
+
+        self.max_retries = 1
+
+    # --------------------- datum helper ------------------------------
+    def _get_datum(self, topic: str = "/fixposition/datum", timeout_s: float = 3.0):
+        datum = None
+        def _cb(msg: NavSatFix):
+            nonlocal datum
+            datum = (msg.latitude, msg.longitude, msg.altitude)
+        sub = self.navigator.create_subscription(NavSatFix, topic, _cb, qos_profile_sensor_data)
+        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(seconds=timeout_s)
+        while rclpy.ok() and datum is None:
+            if self.navigator.get_clock().now() > deadline:
+                raise RuntimeError(f"No NavSatFix on {topic} within {timeout_s}s")
+            rclpy.spin_once(self.navigator, timeout_sec=0.05)
+        self.navigator.destroy_subscription(sub)
+        return datum
+
+    # --------------------- conversion helper -------------------------
+    def _latlon_to_pose(self, lat: float, lon: float, yaw: float) -> PoseStamped:
+        x, y, _ = self._tf_llh2enu.transform(lat, lon, 0.0)
+        ps = PoseStamped()
+        ps.header.frame_id = "map"
+        ps.header.stamp = rclpy.time.Time().to_msg()
+        ps.pose.position.x, ps.pose.position.y = x, y
+        ps.pose.position.z = 0.0
+        ps.pose.orientation = quaternion_from_euler(0.0, 0.0, yaw)
+        return ps
+
+    # --------------------- main loop ---------------------------------
+    def start(self):
         self.navigator.waitUntilNav2Active(localizer="robot_localization")
-        wps = self.wp_parser.get_wps(reverse=self.reverse)
-        self.navigator.followGpsWaypoints(wps)
-        while not self.navigator.isTaskComplete():
-            time.sleep(0.1)
-        print("Waypoints completed successfully")
+        poses = [self._latlon_to_pose(wp["latitude"], wp["longitude"], wp["yaw"]) for wp in self.wps]
+        self.navigator.get_logger().info(f"Starting precise run with {len(poses)} waypoint(s)…")
+
+        for idx, pose in enumerate(poses, start=1):
+            retries_left = self.max_retries
+            while True:
+                self.navigator.goToPose(pose)
+                # spin until done or shutdown
+                while rclpy.ok() and not self.navigator.isTaskComplete():
+                    rclpy.spin_once(self.navigator, timeout_sec=0.05)
+                result = self.navigator.getResult()
+                # -------------------------------------------------- SUCCEEDED
+                if result == TaskResult.SUCCEEDED:
+                    self.navigator.get_logger().info(f"Waypoint {idx}/{len(poses)} reached")
+                    break
+                # -------------------------------------------------- FAILED / CANCELED
+                if result in (TaskResult.FAILED, TaskResult.CANCELED):
+                    if retries_left > 0:
+                        retries_left -= 1
+                        self.navigator.get_logger().warn(
+                            f"Waypoint {idx} {result.name.lower()} - retrying ({self.max_retries - retries_left}/{self.max_retries})")
+                        continue
+                    self.navigator.get_logger().error(f"Waypoint {idx} failed twice - aborting trajectory")
+                    return
+                # -------------------------------------------------- other / unknown
+                self.navigator.get_logger().error(f"Unexpected TaskResult {result} - aborting")
+                return
+
+        self.navigator.get_logger().info("All waypoints completed successfully!")
 
 
-def main(argv: list[str] | None = None):
+def main(argv: List[str] | None = None):
     rclpy.init(args=argv)
-
     parser = argparse.ArgumentParser(description="Follow GPS waypoints from a YAML file")
-    parser.add_argument("yaml_file", nargs="?", default=None, help="Path to the YAML waypoints file")
-    parser.add_argument("--last", action="store_true", help="Load the most recent waypoints file in the config directory")
-    parser.add_argument("--reverse", action="store_true", help="Follow the trajectory in reverse order (adds 180° to yaw)")
+    parser.add_argument("yaml_file", nargs="?", default=None, help="Path to YAML waypoint file")
+    parser.add_argument("--last", action="store_true", help="Use the most recent waypoint file")
+    parser.add_argument("--reverse", action="store_true", help="Follow the path in reverse order (adds 180° yaw)")
     args = parser.parse_args()
 
     try:
-        yaml_file_path = _select_yaml(args)
-    except FileNotFoundError as e:
-        print(f"[WARN] {e}", file=sys.stderr)
-        sys.exit(1)
-
-    # Feedback to the user
-    print(f"Loading waypoints file: {yaml_file_path}")
-
-    try:
-        gps_wpf = GpsWpCommander(yaml_file_path, reverse=args.reverse)
-        gps_wpf.start_wpf()
-    except Exception as exc:
+        yaml_path = _select_yaml(args)
+    except FileNotFoundError as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        commander = GpsWpCommander(yaml_path, reverse=args.reverse)
+        commander.start()
+    except KeyboardInterrupt:
+        print("Interrupted by user - shutting down…", file=sys.stderr)
+    except Exception as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

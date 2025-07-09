@@ -83,7 +83,7 @@ WORKDIR /home/${USER_NAME}
 
 # Create virtual environment for Python packages
 RUN python3 -m venv nav2_env && \
-    /bin/bash -c "source nav2_env/bin/activate && pip install --upgrade pip"
+    /bin/bash -c "source nav2_env/bin/activate && pip install --upgrade pip && pip install 'setuptools<69' 'pip<24'"
 
 # Install Python packages from requirements.txt
 COPY requirements.txt ./
@@ -100,6 +100,7 @@ ENV PATH=/home/${USER_NAME}/.local/bin:${PATH}
 # Expose venv to every subsequent shell
 ENV VIRTUAL_ENV=/home/${USER_NAME}/nav2_env
 ENV PATH=/home/${USER_NAME}/nav2_env/bin:$PATH
+ENV PYTHONPATH=/home/dev/nav2_env/lib/python3.12/site-packages:$PYTHONPATH
 
 # Set DISPLAY for X11 forwarding.
 ENV DISPLAY=:0

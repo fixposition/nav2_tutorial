@@ -72,7 +72,7 @@ converter:
 Build the ROS2 workspace.
 ```bash
 source /opt/ros/jazzy/setup.bash
-colcon build --cmake-args -DBUILD_TESTING=OFF
+colcon build --symlink-install --cmake-args -DBUILD_TESTING=OFF
 ```
 
 
@@ -177,7 +177,7 @@ waypoints:
 ### Manual Logger (`gps_keylogger.py`)
 
 ```bash
-ros2 run nav2_tutorial gps_keylogger.py [optional_output.yaml]
+ros2 run nav2_tutorial gps_keylogger [optional_output.yaml]
 ```
 
 * Press `'f'` to log a waypoint
@@ -190,7 +190,7 @@ Waypoints are saved immediately and safely to disk.
 ### Periodic Logger (`gps_periodic_logger.py`)
 
 ```bash
-ros2 run nav2_tutorial gps_periodic_logger.py [optional_output.yaml] -i 0.2
+ros2 run nav2_tutorial gps_periodic_logger [optional_output.yaml] -i 0.2
 ```
 
 * Logs waypoints automatically every 0.2s (default)
