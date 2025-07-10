@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 from __future__ import annotations
+
 import os
 import sys
 import tty
@@ -39,6 +39,7 @@ class GpsPeriodicLogger(Node):
         self._DIST_TOL_M = 0.01     # Save only if robot moved more than 1 cm
         self._DEG2M_LAT = 110_574.0 # Rough conversion at mid-latitudes
         self._last_saved_fix: NavSatFix | None = None
+        self._last_header_ns: int | None = None  # Last header stamp [ns]
 
         self.create_subscription(NavSatFix, '/fixposition/odometry_llh', self.gps_callback, qos_profile=1)
         self.create_subscription(Odometry, '/fixposition/odometry_enu', self.yaw_callback, qos_profile=1)
@@ -61,12 +62,23 @@ class GpsPeriodicLogger(Node):
         if fix is None:
             return
 
+        # Reject impossible coordinates early
         if not (-90 <= fix.latitude <= 90 and -180 <= fix.longitude <= 180):
+            return
+
+        # Reject out‑of‑order fixes (header time going backwards)
+        stamp = fix.header.stamp
+        curr_ns = stamp.sec * 1_000_000_000 + stamp.nanosec
+        if self._last_header_ns is not None and curr_ns < self._last_header_ns:
+            delta_us = (self._last_header_ns - curr_ns) / 1_000
+            self.get_logger().warn(
+                f"Skipping out-of-order fix: header_time went backwards by {delta_us:.0f} µs")
             return
 
         if self.saved_points == 0:
             self.get_logger().info("Started collecting waypoints …")
 
+        # Distance gate to avoid duplicates / jitter
         if self._last_saved_fix is not None:
             dlat = (fix.latitude - self._last_saved_fix.latitude) * self._DEG2M_LAT
             lon_scale = 111_320.0 * math.cos(math.radians(fix.latitude))
@@ -74,14 +86,18 @@ class GpsPeriodicLogger(Node):
             if math.hypot(dlat, dlon) < self._DIST_TOL_M:
                 return
 
+        # Store LLH point
         self._last_saved_fix = fix
+        self._last_header_ns = curr_ns
+        fix_time_iso = datetime.utcfromtimestamp(curr_ns * 1e-9).isoformat()
 
         waypoint = {
             'latitude': fix.latitude,
             'longitude': fix.longitude,
             'altitude': fix.altitude,
             'yaw': self.last_yaw,
-            'logged_at': datetime.now().isoformat()
+            'header_time': fix_time_iso,
+            'received_time': datetime.now().isoformat()
         }
 
         self.waypoints.append(waypoint)
@@ -124,6 +140,7 @@ class GpsPeriodicLogger(Node):
             f"lon={self.last_gps.longitude:.6f}, yaw={self.last_yaw:.2f}"
         )
 
+
 def _default_yaml_path() -> str:
     share_dir = get_package_share_directory('nav2_tutorial')
     ws_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(share_dir))))
@@ -133,6 +150,7 @@ def _default_yaml_path() -> str:
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     return os.path.join(target_dir, f'gps_waypoints_{ts}.yaml')
 
+
 def _parse_arguments(argv: list[str] | None = None) -> tuple[str, float]:
     parser = argparse.ArgumentParser(description="Periodic GPS Waypoint Logger")
     parser.add_argument('yaml', nargs='?', help='Path to the YAML log file.')
@@ -140,12 +158,15 @@ def _parse_arguments(argv: list[str] | None = None) -> tuple[str, float]:
     args = parser.parse_args(argv)
     return args.yaml or _default_yaml_path(), args.interval
 
+
 def _stdin_ready() -> bool:
     return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
+
 
 def handle_sigterm(signum, frame):
     global stop_requested
     stop_requested = True
+
 
 def main(argv: list[str] | None = None) -> None:
     yaml_path, interval = _parse_arguments(argv)
@@ -177,6 +198,7 @@ def main(argv: list[str] | None = None) -> None:
             node.flush_to_disk()
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

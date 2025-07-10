@@ -209,12 +209,12 @@ nav2_tutorial/src/nav2_tutorial/trajectories/gps_waypoints_<timestamp>.yaml
 
 ## 📈 Visualizing Logged Trajectories
 
-To quickly visualize GPS waypoint logs, use the `visualize_gps_yaml.py` script:
+To quickly visualize GPS waypoint logs, use the `visualize_gps` script:
 
 ### Example:
 ```bash
-python3 utils/visualize_gps_yaml.py path/to/gps_waypoints.yaml         # simple 2D plot
-python3 utils/visualize_gps_yaml.py path/to/gps_waypoints.yaml --map   # map overlay (if supported)
+ros2 run nav2_tutorial visualize_gps path/to/gps_waypoints.yaml         # simple 2D plot
+ros2 run nav2_tutorial visualize_gps path/to/gps_waypoints.yaml --map   # map overlay (if supported)
 ```
 
 ### Requirements for Map Overlay:

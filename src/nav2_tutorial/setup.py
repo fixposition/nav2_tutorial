@@ -38,6 +38,9 @@ setup(
             # Datum Setter
             'set_datum = src.utils.set_datum:main',
             'set_datum_from_tf = src.utils.set_datum_from_tf:main',
+            
+            # Visualizer
+            'visualize_gps = src.utils.visualize_gps:main',
         ],
     },
 )

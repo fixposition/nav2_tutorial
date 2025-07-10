@@ -17,7 +17,7 @@ from nav2_msgs.action import FollowPath
 from visualization_msgs.msg import Marker, MarkerArray
 
 # Custom utils
-from src.utils.nav_utils import (_pose_dist, _path_length, _segment_length, _closest_wp_index, 
+from src.utils.nav_utils import (_pose_dist, _path_length, _segment_length, _closest_wp_index, _closest_pt_and_remaining_len, 
                                  _make_window, _hsv_to_rgb, _get_goal_handle, _get_current_uuid)
 from src.utils.parser_utils import YamlWaypointParser, _select_yaml
 
@@ -186,16 +186,20 @@ class GpsWpCommander:
 
                     # Status handling
                     robot = self._get_robot_pose()
+                    _, s_left = _closest_pt_and_remaining_len(robot, window)
 
                     # 1) SUCCEEDED: accept only if really at tail and nothing remains in the global list
                     if status == TaskResult.SUCCEEDED:
-                        if (_pose_dist(robot, window[-1]) <= self.advance_tol) and not remaining:
+                        if (s_left <= self.advance_tol) and not remaining:
                             self.navigator.get_logger().info("Trajectory finished")
                             break
                         else:
                             # Success was premature: resend the unreached tail
-                            unreached = [p for p in window
-                                        if _pose_dist(robot, p) > self.advance_tol]
+                            start = _closest_wp_index(robot, window)
+                            unreached = window[start:]
+                            if unreached and _pose_dist(robot, unreached[0]) <= self.advance_tol:
+                                unreached = unreached[1:]
+                            
                             if not unreached:
                                 # corner-case: we are at tail but still have poses in ‘remaining’. 
                                 # Continue; the normal sliding-window logic will pick them up.
@@ -213,8 +217,11 @@ class GpsWpCommander:
                     if status in (TaskResult.FAILED, TaskResult.CANCELED):
                         if self._retries_left > 0:
                             self._retries_left -= 1
-                            unreached = [p for p in window
-                                        if _pose_dist(robot, p) > self.advance_tol]
+                            start = _closest_wp_index(robot, window)
+                            unreached = window[start:]
+                            if unreached and _pose_dist(robot, unreached[0]) <= self.advance_tol:
+                                unreached = unreached[1:]
+                            
                             if not unreached:
                                 self.navigator.get_logger().error(
                                     "Retry requested but no poses remain in window")
@@ -236,7 +243,8 @@ class GpsWpCommander:
                 robot = self._get_robot_pose()
 
                 # Assess whether we are close to the window’s tail
-                if _pose_dist(robot, window[-1]) > self.advance_tol:
+                _, s_left = _closest_pt_and_remaining_len(robot, window)
+                if s_left > self.advance_tol:
                     continue
                 
                 # Slide the window forward
@@ -260,6 +268,12 @@ class GpsWpCommander:
                 # Build the forward part of the new window
                 forward  = _make_window(tail, remaining, self.seg_len_max)[1:]  # skip duplicate ‘tail’
                 new_window = overlap + forward
+                
+                # If new window is empty, trigger success condition
+                if not new_window:
+                    self.navigator.get_logger().info("Window is empty! Triggering next segment...")
+                    remaining.clear()
+                    continue
 
                 # Drop from ‘remaining’ exactly the poses we just attached
                 remaining = remaining[len(forward):]

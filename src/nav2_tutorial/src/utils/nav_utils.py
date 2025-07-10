@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Tuple
 from geometry_msgs.msg import PoseStamped
 
 
@@ -43,6 +43,43 @@ def _make_window(start: PoseStamped, todo: list[PoseStamped], seg_len_max: float
         window.append(p)
         length, prev_xy = length + step, (p.pose.position.x, p.pose.position.y)
     return window
+
+
+def _closest_pt_and_remaining_len(robot: PoseStamped,
+                                  poses: List[PoseStamped]) -> Tuple[Tuple[float,float], float]:
+    """
+    Return (closest_xy, s_remaining) where s_remaining is the arc-length
+    from the projection point to the last pose in *poses*.
+    """
+    rx, ry = robot.pose.position.x, robot.pose.position.y
+
+    # Degenerate case: the path consists of a single pose
+    if len(poses) == 1:
+        px, py = poses[0].pose.position.x, poses[0].pose.position.y
+        remain = math.hypot(rx - px, ry - py)
+        return (px, py), remain
+
+    # Locate closest point on the polyline
+    cumlen = [0.0]
+    best_d2, best_i, best_t = float("inf"), 0, 0.0
+    for a, b in zip(poses[:-1], poses[1:]):
+        ax, ay = a.pose.position.x, a.pose.position.y
+        bx, by = b.pose.position.x, b.pose.position.y
+        vx, vy = bx - ax, by - ay
+        seg_sq = vx*vx + vy*vy
+        if seg_sq == 0.0:
+            continue
+        t = max(0.0, min(1.0, ((rx-ax)*vx + (ry-ay)*vy) / seg_sq))
+        qx, qy = ax + t*vx, ay + t*vy
+        d2 = (rx-qx)**2 + (ry-qy)**2
+        if d2 < best_d2:
+            best_d2, best_i, best_t = d2, len(cumlen)-1, t
+        cumlen.append(cumlen[-1] + math.sqrt(seg_sq))
+
+    # Remaining length from projection to the tail
+    seg_len = cumlen[best_i+1] - cumlen[best_i]
+    remain  = (1.0 - best_t) * seg_len + (cumlen[-1] - cumlen[best_i+1])
+    return (qx, qy), remain
 
 
 def _hsv_to_rgb(h: float, s: float = 1.0, v: float = 1.0):

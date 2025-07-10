@@ -4,6 +4,7 @@ import glob
 import math
 import yaml
 import rclpy
+from rclpy.time import Time
 import argparse
 from pyproj import Transformer
 from typing import List, Tuple
@@ -85,7 +86,7 @@ class YamlWaypointParser:
         x, y, _ = self._tf_llh2enu.transform(lat, lon, 0.0)
         pose = PoseStamped()
         pose.header.frame_id = "map"
-        pose.header.stamp    = rclpy.time.Time().to_msg()
+        pose.header.stamp    = Time().to_msg()
         pose.pose.position.x = x
         pose.pose.position.y = y
         pose.pose.position.z = 0.0
