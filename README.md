@@ -262,3 +262,39 @@ Or alternatively use the `--mapviz` flag on the `gps_waypoint_follower.launch.py
 
 # Debugging trajectories
 To analyze the trajectories performed by the robot and determine if any issues have occured, the user can perform a recording of all topics by running `ros2 bag record --all`. Then, launch RViz2 with the provided configuration file to easily visualize the debug topics containing the waypoint coordinates, the global and local plans, the costmaps, among other things: `ros2 run rviz2 rviz2 -d /home/dev/ros_ws/src/nav2_tutorial/config/nav2_plan_viz.rviz`.
+
+# Recommendations
+We suggest employing tmux for controlling the robot via SSH, as intermittent disconnections may kill the running process. Next you'll find some basic steps to get familiar with tmux:
+
+### Installing tmux
+To install tmux on your device, please run the following commands:
+```bash
+sudo apt update && apt install tmux
+```
+
+### Start a tmux session
+After you SSH into the device (using a terminal or VSCode's Remote-SSH), start a new tmux session as:
+```bash
+tmux new -s mysession
+```
+where "mysession" is simply the name given to this tmux session. Note that the prompt will change slightly once inside the tmux session. Inside, you can interact with it as a normal terminal and run any process.
+
+### Detach from tmux
+At any point, the user can "detach" from tmux and the process will keep running in the background. To do this, please press: 'Ctrl + b' (release both) then press 'd'. This detaches from the session and brings you back to the normal shell while the program continues running.
+
+### Reconnect later
+If the SSH connection drops or you log in again later, list running tmux sessions as:
+```bash
+tmux ls
+```
+
+The user will be prompted with something like:
+```bash
+mysession: 1 windows (created Thu Jul  3 14:32:51 2025) [80x24]
+```
+
+To reattach to the tmux session, simply use:
+```bash
+tmux attach -t mysession
+```
+You’re now back inside the process, exactly where you left off.
