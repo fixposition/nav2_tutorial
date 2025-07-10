@@ -1,29 +1,27 @@
-import os
 import sys
-import math
-import yaml
 import argparse
-
-import rclpy
-from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
-
-from rclpy.action import ActionClient
-from rclpy.qos import qos_profile_sensor_data
 from uuid import UUID
-from src.utils.nav_utils import _hsv_to_rgb, _get_goal_handle, _get_current_uuid
-from src.utils.parser_utils import YamlWaypointParser, _latest_file, _resolve_ws_paths, _select_yaml
+
+# ROS packages
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.qos import qos_profile_sensor_data, QoSProfile, DurabilityPolicy
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
 # ROS messages
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import Odometry
 from action_msgs.msg import GoalStatus
+from nav_msgs.msg import Path, Odometry
 from nav2_msgs.action import FollowPath
+from visualization_msgs.msg import Marker, MarkerArray
+
+# Custom utils
+from src.utils.nav_utils import (_pose_dist, _path_length, _segment_length, _closest_wp_index, 
+                                 _make_window, _hsv_to_rgb, _get_goal_handle, _get_current_uuid)
+from src.utils.parser_utils import YamlWaypointParser, _latest_file, _resolve_ws_paths, _select_yaml
 
 # Visualization
-from nav_msgs.msg import Path
-from visualization_msgs.msg import Marker, MarkerArray
-from rclpy.qos import QoSProfile, DurabilityPolicy
 MARKER_VIZ = True
 
 
@@ -45,7 +43,7 @@ class GpsWpCommander:
 
         # Parameters for the GoThroughPoses task
         self.odom_timeout_s = 2.0  # wait this long for first /fixposition msg
-        self.max_retries    = 1    # re-attempt each failed segment once
+        self.max_retries    = 1    # re-attempts for each failed segment
         self._retries_left  = self.max_retries
         self._last_goal_uuid: UUID | None = None
         
@@ -116,13 +114,14 @@ class GpsWpCommander:
         # Publish the full trajectory for visualization
         self._publish_full_traj(all_poses)
 
+        # Loop through the waypoints
         for loop_idx in range(self.num_loop):
             if self.num_loop > 1:
                 self.navigator.get_logger().info(
                     f"Performing loop {loop_idx + 1} out of {self.num_loop}…")
             
             self._total_wps = len(all_poses)
-            total_len       = self._path_length(all_poses)
+            total_len       = _path_length(all_poses)
             self.navigator.get_logger().info(
                 f"Preparing segments for trajectory of {total_len:0.2f} m "
                 f"consisting of {self._total_wps} waypoints…")
@@ -134,8 +133,8 @@ class GpsWpCommander:
 
             if self.num_loop == 1:
                 # Fast-forward to the first pose within start_seg_tol
-                closest_idx = self._closest_wp_index(robot, remaining)
-                if self._dist(robot, remaining[closest_idx]) > self.start_seg_tol:
+                closest_idx = _closest_wp_index(robot, remaining)
+                if _pose_dist(robot, remaining[closest_idx]) > self.start_seg_tol:
                     closest_idx = 0                    # fall back to the first wp
 
                 if closest_idx:
@@ -151,7 +150,7 @@ class GpsWpCommander:
                 self.navigator.get_logger().info("Trajectory already completed.")
                 return
 
-            window  = self._make_window(robot, remaining)
+            window  = _make_window(robot, remaining, self.seg_len_max)
             if len(window) == 1:          # no waypoint fit inside seg_len_max
                 window.append(remaining[0])
                 new_wps = 1
@@ -194,14 +193,14 @@ class GpsWpCommander:
 
                     # 1) SUCCEEDED: accept only if really at tail and nothing remains in the global list
                     if status == TaskResult.SUCCEEDED:
-                        at_tail = (self._dist(robot, window[-1]) <= self.advance_tol)
+                        at_tail = (_pose_dist(robot, window[-1]) <= self.advance_tol)
                         if at_tail and not remaining:
                             self.navigator.get_logger().info("Trajectory finished")
                             break
                         else:
                             # Success was premature: resend the unreached tail
                             unreached = [p for p in window
-                                        if self._dist(robot, p) > self.advance_tol]
+                                        if _pose_dist(robot, p) > self.advance_tol]
                             if not unreached:
                                 # corner-case: we are at tail but still have poses in ‘remaining’. 
                                 # Continue; the normal sliding-window logic will pick them up.
@@ -220,7 +219,7 @@ class GpsWpCommander:
                         if self._retries_left > 0:
                             self._retries_left -= 1
                             unreached = [p for p in window
-                                        if self._dist(robot, p) > self.advance_tol]
+                                        if _pose_dist(robot, p) > self.advance_tol]
                             if not unreached:
                                 self.navigator.get_logger().error(
                                     "Retry requested but no poses remain in window")
@@ -242,19 +241,19 @@ class GpsWpCommander:
                 robot = self._get_robot_pose()
 
                 # Assess whether we are close to the window’s tail
-                if self._dist(robot, window[-1]) > self.advance_tol:
+                if _pose_dist(robot, window[-1]) > self.advance_tol:
                     continue
                 
                 # Slide the window forward
                 tail = window[-1]
 
                 # Overlap: walk backwards inside the old window
-                dist_rt = self._dist(robot, tail)
+                dist_rt = _pose_dist(robot, tail)
 
                 overlap = []
                 for p in reversed(window):
-                    if (self._dist(p, tail) <= self.overlap_tol and      # close to tail
-                        self._dist(robot, p) <= dist_rt + 1e-6):         # not behind robot
+                    if (_pose_dist(p, tail) <= self.overlap_tol and      # close to tail
+                        _pose_dist(robot, p) <= dist_rt + 1e-6):         # not behind robot
                         overlap.append(p)
                     else:
                         break
@@ -264,7 +263,7 @@ class GpsWpCommander:
                     continue   # path finished; let Nav2 coast to the end
 
                 # Build the forward part of the new window
-                forward  = self._make_window(tail, remaining)[1:]  # skip duplicate ‘tail’
+                forward  = _make_window(tail, remaining, self.seg_len_max)[1:]  # skip duplicate ‘tail’
                 new_window = overlap + forward
 
                 # Drop from ‘remaining’ exactly the poses we just attached
@@ -336,49 +335,12 @@ class GpsWpCommander:
             rclpy.spin_once(self.navigator, timeout_sec=0.05)
 
         return self._last_odom_pose
-        
-    def _dist(self, a: PoseStamped, b: PoseStamped) -> float:
-        """Return the Euclidean distance between two PoseStamped messages."""
-        dx, dy = a.pose.position.x - b.pose.position.x, a.pose.position.y - b.pose.position.y
-        return math.hypot(dx, dy)
-    
-    def _path_length(self, poses: list[PoseStamped]) -> float:
-        """Return the total length of the path defined by the poses."""
-        return sum(self._dist(a, b) for a, b in zip(poses[:-1], poses[1:]))
-
-    def _make_window(self, start: PoseStamped, todo: list[PoseStamped]) -> list[PoseStamped]:
-        """Return [start] + as many todo-poses as fit within seg_len_max."""
-        window  = [start]
-        length  = 0.0
-        prev_xy = (start.pose.position.x, start.pose.position.y)
-
-        for p in todo:
-            step = math.hypot(p.pose.position.x - prev_xy[0],
-                            p.pose.position.y - prev_xy[1])
-            if length + step > self.seg_len_max:
-                break
-            window.append(p)
-            length, prev_xy = length + step, (p.pose.position.x, p.pose.position.y)
-        return window
-    
-    def _segment_length(self, poses: list[PoseStamped]) -> float:
-        """Return the length of the segment defined by the poses."""
-        return sum(self._dist(a, b) for a, b in zip(poses[:-1], poses[1:]))
-    
-    def _closest_wp_index(self, robot: PoseStamped, poses: list[PoseStamped]) -> int:
-        """Compute the index of the closest waypoint to the robot."""
-        d_min, idx_min = float("inf"), 0
-        for i, p in enumerate(poses):
-            d = self._dist(robot, p)
-            if d < d_min:
-                d_min, idx_min = d, i
-        return idx_min
 
     def _log_segment(self, window,
                      *, overlap_cnt: int,
                      seg_idx: int) -> None:
         """Log the segment statistics."""
-        seg_len  = self._segment_length(window)
+        seg_len  = _segment_length(window)
         num_wps  = len(window)
         progress = self._visited_wps
 
@@ -480,7 +442,7 @@ def main(argv: list[str] | None = None):
     try:
         yaml_file_path = _select_yaml(args)
     except FileNotFoundError as e:
-        print(f"[WARN] {e}", file=sys.stderr)
+        print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(1)
 
     # Feedback to the user
@@ -491,6 +453,8 @@ def main(argv: list[str] | None = None):
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
+    finally:
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
