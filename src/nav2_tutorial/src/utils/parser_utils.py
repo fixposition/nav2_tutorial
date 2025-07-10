@@ -1,6 +1,7 @@
 import os
 import copy
 import glob
+import math
 import yaml
 import rclpy
 import argparse
@@ -129,11 +130,9 @@ def _latest_file(directory: str, pattern: str = "gps_waypoints_2*.yaml") -> str 
 
 
 def _resolve_ws_paths() -> tuple[str, str]:
-    """Return ``(src_traj_dir, share_traj_dir)`` for *nav2_tutorial*.
-
-    *share_traj_dir* is the directory installed by ``ament`` (typically
-    ``install/share/nav2_tutorial/trajectories``) while *src_traj_dir* points to
-    the editable source tree (``<ws_root>/src/nav2_tutorial/trajectories``).
+    """Return (src_traj_dir, share_traj_dir), *share_traj_dir* is the directory 
+    installed by ``ament`` (typically ``install/share/nav2_tutorial/trajectories``)
+    while *src_traj_dir* points to the editable source tree.
     """
     share_dir = get_package_share_directory("nav2_tutorial")
     share_traj_dir = os.path.join(share_dir, "trajectories")
@@ -169,6 +168,7 @@ def _select_yaml(args: argparse.Namespace) -> str:
 
     # 2) --last flag
     if args.last:
+        chosen = None
         src_latest = _latest_file(src_traj_dir)
         share_latest = _latest_file(share_traj_dir)
 
@@ -179,17 +179,18 @@ def _select_yaml(args: argparse.Namespace) -> str:
             chosen = src_latest or share_latest  # whichever is not None (could still be None)
 
         if chosen is None:
-            raise FileNotFoundError(f"No waypoint files matching 'gps_waypoints_2*.yaml' found in '{src_traj_dir}' or '{share_traj_dir}'.")
+            raise FileNotFoundError(
+                f"No waypoint files matching 'gps_waypoints_2*.yaml' found in '{src_traj_dir}' or '{share_traj_dir}'."
+            )
         return chosen
 
     # 3) Default lookup "gps_waypoints.yaml"
     default_name = "gps_waypoints.yaml"
-    candidate_src = os.path.join(src_traj_dir, default_name)
-    if os.path.isfile(candidate_src):
-        return candidate_src
+    for base in (src_traj_dir, share_traj_dir):
+        candidate = os.path.join(base, default_name)
+        if os.path.isfile(candidate):
+            return candidate
 
-    candidate_share = os.path.join(share_traj_dir, default_name)
-    if os.path.isfile(candidate_share):
-        return candidate_share
-
-    raise FileNotFoundError(f"Default waypoint file '{default_name}' not found in '{src_traj_dir}' or '{share_traj_dir}'.")
+    raise FileNotFoundError(
+        f"Default waypoint file '{default_name}' not found in '{src_traj_dir}' or '{share_traj_dir}'."
+    )

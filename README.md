@@ -93,9 +93,9 @@ sudo ip link set can0 up type can bitrate 500000
 candump can0
 ```
 
-Alternatively, the user can also directly execute the provided script start_can.sh:
+Alternatively, the user can also directly execute the provided script setup-can.sh:
 ```bash
-sudo ./scripts/start_can.sh
+sudo ./scripts/setup-can.sh
 ```
 
 Example output from the can0 port:
