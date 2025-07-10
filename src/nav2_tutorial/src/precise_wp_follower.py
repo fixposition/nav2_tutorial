@@ -69,17 +69,14 @@ class GpsWpCommander:
         Block until a NavSatFix is received on topic (max timeout_s).
         Returns (lat [deg], lon [deg], alt [m]). Raises RuntimeError on timeout.
         """
-        datum: list[float] | None = None
-
+        datum = None
         def _cb(msg: NavSatFix):
             nonlocal datum
-            datum = [msg.latitude, msg.longitude, msg.altitude]
+            datum = (msg.latitude, msg.longitude, msg.altitude)
 
-        sub = self.navigator.create_subscription(
-            NavSatFix, topic, _cb, qos_profile_sensor_data)
+        sub = self.navigator.create_subscription(NavSatFix, topic, _cb, qos_profile_sensor_data)
 
-        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(
-            seconds=timeout_s)
+        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(seconds=timeout_s)
 
         while rclpy.ok() and datum is None:
             rclpy.spin_once(self.navigator, timeout_sec=0.05)
@@ -87,7 +84,7 @@ class GpsWpCommander:
                 raise RuntimeError(f"No NavSatFix on {topic} within {timeout_s}s")
 
         self.navigator.destroy_subscription(sub)
-        return tuple(datum)
+        return datum
 
     def start_ntp(self):
         """Start the GoToPose task with the waypoints."""
@@ -230,6 +227,7 @@ class GpsWpCommander:
                                   overlap_cnt = len(overlap),
                                   seg_idx     = seg_idx)
                 
+                # Send next window
                 self.navigator.goToPose(new_window)
                 self._retries_left = self.max_retries
                 seg_idx += 1

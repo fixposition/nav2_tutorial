@@ -28,10 +28,11 @@ MARKER_VIZ = True
 class GpsWpCommander:
     """Follow a smooth sequence of GPS waypoints."""
 
-    def __init__(self, wps_file_path: str, reverse: bool = False, num_loop: int = 1):
+    def __init__(self, wps_file_path: str, reverse: bool = False, num_loop: int = 1, stopping: bool = False):
         self.navigator  = BasicNavigator("basic_navigator")
         self.reverse    = reverse
         self.num_loop   = num_loop
+        self.stopping  = stopping
 
         # Odometry topic with ENU pose in map frame
         self._last_odom_pose: PoseStamped | None = None
@@ -45,6 +46,7 @@ class GpsWpCommander:
         self.odom_timeout_s = 2.0  # wait this long for first /fixposition msg
         self.max_retries    = 1    # re-attempts for each failed segment
         self._retries_left  = self.max_retries
+        self._fp_client     = None
         self._last_goal_uuid: UUID | None = None
         
         # Sliding-window parameters
@@ -54,13 +56,12 @@ class GpsWpCommander:
         self.advance_tol      = 2.6   # m - when to roll the window forward
         self.overlap_tol      = 1.0   # m - keep poses this close as overlap
         self.start_seg_tol    = 3.0   # m - max distance we “snap” to the path
-        self._fp_client = None
         
         # Statistics
         self._total_wps   = 0
         self._visited_wps = 0
         
-        # Marker visualization
+        # Optional: Marker visualization
         if MARKER_VIZ:
             latched_qos = QoSProfile(
                 depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -83,17 +84,14 @@ class GpsWpCommander:
         Block until a NavSatFix is received on topic (max timeout_s).
         Returns (lat [deg], lon [deg], alt [m]). Raises RuntimeError on timeout.
         """
-        datum: list[float] | None = None
-
+        datum = None
         def _cb(msg: NavSatFix):
             nonlocal datum
-            datum = [msg.latitude, msg.longitude, msg.altitude]
+            datum = (msg.latitude, msg.longitude, msg.altitude)
 
-        sub = self.navigator.create_subscription(
-            NavSatFix, topic, _cb, qos_profile_sensor_data)
+        sub = self.navigator.create_subscription(NavSatFix, topic, _cb, qos_profile_sensor_data)
 
-        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(
-            seconds=timeout_s)
+        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(seconds=timeout_s)
 
         while rclpy.ok() and datum is None:
             rclpy.spin_once(self.navigator, timeout_sec=0.05)
@@ -101,7 +99,7 @@ class GpsWpCommander:
                 raise RuntimeError(f"No NavSatFix on {topic} within {timeout_s}s")
 
         self.navigator.destroy_subscription(sub)
-        return tuple(datum)
+        return datum
 
     def start_ntp(self):
         """Start the GoThroughPoses task with the waypoints."""
@@ -135,10 +133,10 @@ class GpsWpCommander:
                 # Fast-forward to the first pose within start_seg_tol
                 closest_idx = _closest_wp_index(robot, remaining)
                 if _pose_dist(robot, remaining[closest_idx]) > self.start_seg_tol:
-                    closest_idx = 0                    # fall back to the first wp
+                    closest_idx = 0
 
                 if closest_idx:
-                    self._visited_wps += closest_idx   # statistics
+                    self._visited_wps += closest_idx
                     skipped = closest_idx
                     remaining = remaining[closest_idx:]
                     self.navigator.get_logger().info(
@@ -158,9 +156,7 @@ class GpsWpCommander:
                 new_wps = len(window) - 1
             
             self._visited_wps += new_wps
-            self._log_segment(window,
-                              overlap_cnt = 0,
-                              seg_idx     = seg_idx)
+            self._log_segment(window, overlap_cnt=0, seg_idx=seg_idx)
             self._publish_waypoints(window, seg_idx)
             self.navigator.goThroughPoses(window)
             
@@ -193,8 +189,7 @@ class GpsWpCommander:
 
                     # 1) SUCCEEDED: accept only if really at tail and nothing remains in the global list
                     if status == TaskResult.SUCCEEDED:
-                        at_tail = (_pose_dist(robot, window[-1]) <= self.advance_tol)
-                        if at_tail and not remaining:
+                        if (_pose_dist(robot, window[-1]) <= self.advance_tol) and not remaining:
                             self.navigator.get_logger().info("Trajectory finished")
                             break
                         else:
@@ -271,41 +266,36 @@ class GpsWpCommander:
                 
                 # Log stats before cancel / send goal
                 self._visited_wps += len(forward)
-                self._log_segment(new_window,
-                                  overlap_cnt = len(overlap),
-                                  seg_idx     = seg_idx)
+                self._log_segment(new_window, overlap_cnt=len(overlap), seg_idx=seg_idx)
 
-                # # Pre-empt the running action
-                # self.navigator.cancelTask()
-                # # Wait until the cancellation is fully processed
-                # cancel_deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(
-                #     seconds=3.0)                        # plenty - normally < 0.3 s
-                # while not self.navigator.isTaskComplete():
-                #     if self.navigator.get_clock().now() > cancel_deadline:
-                #         self.navigator.get_logger().error("Cancel timeout - aborting")
-                #         return
-                #     rclpy.spin_once(self.navigator, timeout_sec=0.05)
-                    
-                # #  Extra guard: wait until internal follow_path is cancelled
-                # if self._fp_client is None:
-                #     self._fp_client = ActionClient(self.navigator, FollowPath, "follow_path")
-                #     if not self._fp_client.wait_for_server(timeout_sec=2.0):
-                #         self.navigator.get_logger().warn("follow_path server not available")
-
-                # fp_deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(
-                #     seconds=3.0)
-                # while True:
-                #     goal_handles = self._fp_client._goal_handles  # internal list
-                #     if not goal_handles:
-                #         break                                   # nothing active
-                #     status = goal_handles[0].status
-                #     if status in (GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED):
-                #         break
-                #     if self.navigator.get_clock().now() > fp_deadline:
-                #         self.navigator.get_logger().error("follow_path cancel timeout")
-                #         return
-                #     rclpy.spin_once(self.navigator, timeout_sec=0.05)
+                # Optional: explicit cancellation before sending new window
+                if self.stopping:
+                    self.navigator.cancelTask()
+                    cancel_deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(seconds=3.0)
+                    while not self.navigator.isTaskComplete():
+                        if self.navigator.get_clock().now() > cancel_deadline:
+                            self.navigator.get_logger().error("Cancel timeout - aborting")
+                            return
+                        rclpy.spin_once(self.navigator, timeout_sec=0.05)
+                    # extra guard: ensure internal follow_path is cancelled
+                    if self._fp_client is None:
+                        self._fp_client = ActionClient(self.navigator, FollowPath, "follow_path")
+                        if not self._fp_client.wait_for_server(timeout_sec=2.0):
+                            self.navigator.get_logger().warn("follow_path server not available")
+                    fp_deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(seconds=3.0)
+                    while True:
+                        goal_handles = self._fp_client._goal_handles
+                        if not goal_handles:
+                            break
+                        status = goal_handles[0].status
+                        if status in (GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED):
+                            break
+                        if self.navigator.get_clock().now() > fp_deadline:
+                            self.navigator.get_logger().error("follow_path cancel timeout - aborting")
+                            return
+                        rclpy.spin_once(self.navigator, timeout_sec=0.05)
                 
+                # Send next window
                 self._publish_waypoints(new_window, seg_idx)
                 self.navigator.goThroughPoses(new_window)
                 self._retries_left = self.max_retries
@@ -437,6 +427,7 @@ def main(argv: list[str] | None = None):
     parser.add_argument("--last", action="store_true", help="Load the most recent waypoints file in the config directory")
     parser.add_argument("--reverse", action="store_true", help="Follow the trajectory in reverse order (adds 180° to yaw)")
     parser.add_argument("--loop", type=int, default=1, help="Number of times to loop through the waypoints (default: 1)")
+    parser.add_argument("--stopping", action="store_true", help="Stop at the end of every segment")
     args = parser.parse_args()
 
     try:
@@ -448,7 +439,7 @@ def main(argv: list[str] | None = None):
     # Feedback to the user
     print(f"Loading waypoints file: {yaml_file_path}")
     try:
-        gps_wpf = GpsWpCommander(yaml_file_path, reverse=args.reverse, num_loop=args.loop)
+        gps_wpf = GpsWpCommander(yaml_file_path, reverse=args.reverse, num_loop=args.loop, stopping=args.stopping)
         gps_wpf.start_ntp()
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
