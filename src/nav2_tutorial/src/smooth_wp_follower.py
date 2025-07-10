@@ -19,7 +19,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 # Custom utils
 from src.utils.nav_utils import (_pose_dist, _path_length, _segment_length, _closest_wp_index, 
                                  _make_window, _hsv_to_rgb, _get_goal_handle, _get_current_uuid)
-from src.utils.parser_utils import YamlWaypointParser, _latest_file, _resolve_ws_paths, _select_yaml
+from src.utils.parser_utils import YamlWaypointParser, _select_yaml
 
 # Visualization
 MARKER_VIZ = True
@@ -28,10 +28,10 @@ MARKER_VIZ = True
 class GpsWpCommander:
     """Follow a smooth sequence of GPS waypoints."""
 
-    def __init__(self, wps_file_path: str, reverse: bool = False, num_loop: int = 1, stopping: bool = False):
-        self.navigator  = BasicNavigator("basic_navigator")
-        self.reverse    = reverse
-        self.num_loop   = num_loop
+    def __init__(self, wps_file_path: str, reverse: bool = False, num_loop: int = 1, stopping: bool = False) -> None:
+        self.navigator = BasicNavigator("basic_navigator")
+        self.reverse   = reverse
+        self.num_loop  = max(1, num_loop)
         self.stopping  = stopping
 
         # Odometry topic with ENU pose in map frame
@@ -43,7 +43,7 @@ class GpsWpCommander:
         self.wp_parser  = YamlWaypointParser(wps_file_path, base_lat, base_lon, base_alt)
 
         # Parameters for the GoThroughPoses task
-        self.odom_timeout_s = 2.0  # wait this long for first /fixposition msg
+        self.odom_timeout_s = 2.0  # wait for odom on start‑up
         self.max_retries    = 1    # re-attempts for each failed segment
         self._retries_left  = self.max_retries
         self._fp_client     = None
@@ -73,7 +73,7 @@ class GpsWpCommander:
                     MarkerArray, "/gps_waypoints_markers", latched_qos)
         
             # Path and MarkerArray for visualizing the full trajectory
-            self.full_traj_pub   = self.navigator.create_publisher(
+            self.full_traj_pub = self.navigator.create_publisher(
                 Path, "/gps_full_traj", latched_qos)
             self.full_traj_mrk_pub = self.navigator.create_publisher(
                 MarkerArray, "/gps_full_traj_markers", latched_qos)
@@ -303,7 +303,7 @@ class GpsWpCommander:
                 window = new_window
         
     def _odom_cb(self, msg: Odometry) -> None:
-        """Cache the most recent odometry pose as a `PoseStamped`."""
+        """Cache the latest odometry pose (PoseStamped)."""
         ps = PoseStamped()
         ps.header = msg.header
         ps.pose   = msg.pose.pose
@@ -314,8 +314,8 @@ class GpsWpCommander:
         Return the most recent pose from /fixposition/odometry_enu.
         Blocks (spins) until a message arrives or the timeout elapses.
         """
-        deadline = self.navigator.get_clock().now() + rclpy.duration.Duration(
-            seconds=self.odom_timeout_s)
+        deadline = (self.navigator.get_clock().now() + 
+                    rclpy.duration.Duration(seconds=self.odom_timeout_s))
 
         while self._last_odom_pose is None:
             if self.navigator.get_clock().now() > deadline:
@@ -340,7 +340,7 @@ class GpsWpCommander:
             f"Overlap: {overlap_cnt}, "
             f"Progress: {progress}/{self._total_wps}")
     
-    def _publish_waypoints(self, poses: list[PoseStamped], seg_idx: int):
+    def _publish_waypoints(self, poses: list[PoseStamped], seg_idx: int) -> None:
         """Publish the current segment as a Path and MarkerArray."""
         # Path message
         path = Path()
@@ -382,7 +382,7 @@ class GpsWpCommander:
             markers.markers.append(m)
         self.waypoint_marker_pub.publish(markers)
     
-    def _publish_full_traj(self, poses: list[PoseStamped]):
+    def _publish_full_traj(self, poses: list[PoseStamped]) -> None:
         """Publish the whole trajectory as a latched Path + MarkerArray."""
         path = Path()
         path.header.frame_id = "map"
