@@ -30,6 +30,7 @@ class GpsWpCommander:
         self.num_loop  = max(1, num_loop)
 
         # Odometry topic with ENU pose in map frame
+        self._last_odom_ns: int | None = None
         self._last_odom_pose: PoseStamped | None = None
         self.navigator.create_subscription(Odometry, "/fixposition/odometry_enu", self._odom_cb, 10)
         
@@ -157,7 +158,18 @@ class GpsWpCommander:
         self.navigator.get_logger().info("All waypoints completed - mission finished")
         
     def _odom_cb(self, msg: Odometry) -> None:
-        """Cache the latest odometry pose (PoseStamped)."""
+        """Cache the latest odometry pose, skipping out-of-order messages."""
+        stamp = msg.header.stamp
+        curr_ns = stamp.sec * 1_000_000_000 + stamp.nanosec
+
+        # Reject if header time went backwards
+        if self._last_odom_ns is not None and curr_ns < self._last_odom_ns:
+            self.navigator.get_logger().warn(
+                "Skipping out-of-order odometry message (time jumped backwards)" )
+            return
+
+        # Accept the pose
+        self._last_odom_ns = curr_ns
         ps = PoseStamped()
         ps.header = msg.header
         ps.pose   = msg.pose.pose
