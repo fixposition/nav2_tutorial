@@ -4,6 +4,7 @@ from dash import html, dcc, Output, Input, State, ctx
 import os
 import subprocess
 import glob
+import json
 import threading
 import queue
 import yaml
@@ -17,6 +18,16 @@ PRECISE_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/precise_wp_follower.py'
 SMOOTH_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/smooth_wp_follower.py'
 INTERACTIVE_SCRIPT = '/home/dev/ros_ws/src/nav2_tutorial/src/interactive_wp_follower.py'
 CLICKED_SCRIPT = "/home/dev/ros_ws/src/nav2_tutorial/src/dashboard/send_clicked_point.py"
+LIVE_CURR_POSE = '/tmp/current_position.json'
+
+
+def load_current_position():
+    try:
+        with open(LIVE_CURR_POSE, 'r') as f:
+            pos = json.load(f)
+        return pos['lat'], pos['lon']
+    except Exception:
+        return None, None
 
 def get_trajectories():
     return sorted(glob.glob(os.path.join(TRAJECTORY_DIR, '*.yaml')))
@@ -158,6 +169,7 @@ app.layout = dbc.Container([
     dcc.Store(id="reverse-store", data=False),
     dcc.Store(id="clicked-point", data=None),
     dcc.Store(id="mode-store", data="precise"),
+    dcc.Interval(id='live-position-interval', interval=200, n_intervals=0)
 ])
 
 # ----- CALLBACKS -----
@@ -169,9 +181,12 @@ app.layout = dbc.Container([
     Input("using-last-store", "data"),
     Input("show-orientation", "value"),
     Input("clicked-point", "data"),
+    Input('live-position-interval', 'n_intervals'),
     State("mode-store", "data"),
 )
-def update_trajectory_map(selected_file, using_last, show_orientation, clicked_point, mode):
+def update_trajectory_map(selected_file, using_last, show_orientation, clicked_point, mode, n_intervals):
+    data = []
+
     if using_last or selected_file == "USING_LAST":
         files = get_trajectories()
         if not files:
@@ -187,15 +202,27 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
             "data": [],
             "layout": {"title": "No trajectory selected", "height": 500}
         }
+        
+    # Load live pose
+    lat, lon = load_current_position()
+    if lat is not None and lon is not None:
+        data.append({
+            "type": "scattermapbox",
+            "lat": [lat],
+            "lon": [lon],
+            "mode": "markers",
+            "marker": {"size": 12, "color": "lime"},
+            "name": "Current Position"
+        })
+        
+    # Load trajectory data
     lats, lons, yaws = load_trajectory_from_yaml(yaml_path)
     if not lats or not lons:
         return {
             "data": [],
             "layout": {"title": "No waypoints in file", "height": 500}
         }
-
-    # Trajectory data
-    data = [{
+    data.append({
         "type": "scattermapbox",
         "lat": lats,
         "lon": lons,
@@ -203,17 +230,17 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
         "marker": {"size": 8, "color": "red"},
         "line": {"width": 2, "color": "blue"},
         "name": "Trajectory"
-    }]
+    })
 
     # Add orientation arrows if requested
     if show_orientation:
         arrow_scale = 0.000009
         arrow_lats, arrow_lons = [], []
-        for lat, lon, yaw in zip(lats, lons, yaws):
+        for lat_val, lon_val, yaw in zip(lats, lons, yaws):
             dlat = math.cos(yaw) * arrow_scale
-            dlon = math.sin(yaw) * arrow_scale / max(math.cos(math.radians(lat)), 1e-6)
-            arrow_lats += [lat, lat + dlat, None]
-            arrow_lons += [lon, lon + dlon, None]
+            dlon = math.sin(yaw) * arrow_scale / max(math.cos(math.radians(lat_val)), 1e-6)
+            arrow_lats += [lat_val, lat_val + dlat, None]
+            arrow_lons += [lon_val, lon_val + dlon, None]
         data.append({
             "type": "scattermapbox",
             "lat": arrow_lats,
@@ -235,7 +262,7 @@ def update_trajectory_map(selected_file, using_last, show_orientation, clicked_p
             lat_center=lat_center,
             lon_center=lon_center,
             lat_range=0.0003,   # Adjust as needed (≈32m at mid latitudes)
-            lon_range=0.0005,    # ≈40m
+            lon_range=0.0005,   # ≈40m
             n=60                # 40x40 = 1600 clickable points
         )
         data.append({
