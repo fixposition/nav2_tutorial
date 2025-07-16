@@ -235,19 +235,19 @@ ros2 launch nav2_tutorial gps_waypoint_follower.launch.py
 ```
 Note: You can use the `all_nodes.launch.py` file to achieve this. For navigation, this repository provides three waypoint following methods: Precise, Smooth, and Interactive. We can only choose one method each time we execute it.
 
-* Precise GPS Waypoint Follower
-The `precise_wp_follower` script streams all the logged points from a YAML file and makes the robot follow them point-by-point, stopping at every waypoint when the accuracy threshold is met.
-```bash
-ros2 run nav2_tutorial precise_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
-```
-
-* Smooth GPS Waypoint Follower
+* Smooth GPS Waypoint Follower (Recommended):
 The `smooth_wp_follower` script streams all the logged points from a YAML file and divides them in segments, pre-computing a smooth trajectory for the robot to follow. This ensure constant speed throughout the waypoint following task.
 ```bash
 ros2 run nav2_tutorial smooth_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
 ```
 
-* Interactive GPS Waypoint Follower
+* Precise GPS Waypoint Follower:
+The `precise_wp_follower` script streams all the logged points from a YAML file and makes the robot follow them point-by-point, stopping at every waypoint when the accuracy threshold is met. Note: Avoid combining this method with the periodic logger at high rates. Logging too frequently creates waypoints that are very close together, which can cause the robot to stop and start excessively at each point, leading to unstable behavior.
+```bash
+ros2 run nav2_tutorial precise_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
+```
+
+* Interactive GPS Waypoint Follower:
 The `interactive_wp_follower` script listens to the mapviz topic for the next waypoint objective.
 ```bash
 ros2 run nav2_tutorial interactive_wp_follower
