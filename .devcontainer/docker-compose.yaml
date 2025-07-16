@@ -1,7 +1,7 @@
 version: '3.8'
 
-services:  
-  vrtk:
+services:
+  builder:
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,7 +10,13 @@ services:
         USER_ID: "${HOST_UID}"
         GROUP_ID: "${HOST_GID}"
         BASE_IMAGE: "ros:jazzy-perception"
-    container_name: ros2_vrtk_container
+    image: ros2_dev:latest
+    command: /bin/true  # Do nothing, just build
+    restart: "no"
+
+  runner:
+    image: ros2_dev:latest
+    container_name: ros2_runner
     volumes:
       - ..:/home/dev/ros_ws
       - /tmp/.X11-unix:/tmp/.X11-unix
@@ -18,26 +24,33 @@ services:
     network_mode: host
     environment:
       - DISPLAY=${DISPLAY}
-    restart: always
+    command: >
+      bash -lc "
+        set -e && \
+        source /home/dev/nav2_env/bin/activate && \
+        source /opt/ros/jazzy/setup.bash && \
+        colcon build --symlink-install --cmake-args -DBUILD_TESTING=OFF && \
+        source install/setup.bash && \
+        exec ros2 launch nav2_tutorial all_nodes.launch.py
+      "
+    restart: unless-stopped
     stdin_open: true
     tty: true
-    entrypoint:
-      - bash
-      - -lc
-      - |
-          set -e
 
-          # source virtual environment
-          source /home/dev/nav2_env/bin/activate
-
-          # source ROS
-          source /opt/ros/jazzy/setup.bash
-
-          # ensure the workspace is built or latest build is sourced
-          colcon build --symlink-install --cmake-args -DBUILD_TESTING=OFF
-
-          # source the workspace
-          source install/setup.bash
-
-          # launch everything in one go
-          exec ros2 launch nav2_tutorial all_nodes.launch.py
+  vrtk:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        USER_NAME: "dev"
+        USER_ID: "${HOST_UID}"
+        GROUP_ID: "${HOST_GID}"
+        BASE_IMAGE: "ros:jazzy-perception"
+    volumes:
+      - ..:/home/dev/ros_ws
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    network_mode: host
+    environment:
+      - DISPLAY=${DISPLAY}
+    stdin_open: true
+    tty: true
