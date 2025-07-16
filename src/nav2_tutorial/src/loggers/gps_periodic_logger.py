@@ -25,6 +25,10 @@ from src.utils.gps_utils import euler_from_quaternion
 stop_requested = False
 
 class GpsPeriodicLogger(Node):
+    """
+    ROS2 node to log GPS waypoints to a YAML file based on timer. Press 'q' to quit.
+    """
+    
     def __init__(self, logging_file_path: str, interval: float):
         super().__init__('gps_waypoint_periodic_logger')
 
@@ -44,7 +48,7 @@ class GpsPeriodicLogger(Node):
         self.create_subscription(NavSatFix, '/fixposition/odometry_llh', self.gps_callback, qos_profile=1)
         self.create_subscription(Odometry, '/fixposition/odometry_enu', self.yaw_callback, qos_profile=1)
 
-        self.create_timer(self.log_interval, self._log_waypoint)
+        self.create_timer(self.log_interval, self.log_waypoint)
         self.create_timer(2.0, self._status_message)
 
         self.get_logger().info(
@@ -57,13 +61,15 @@ class GpsPeriodicLogger(Node):
     def yaw_callback(self, msg: Odometry) -> None:
         _, _, self.last_yaw = euler_from_quaternion(msg.pose.pose.orientation)
 
-    def _log_waypoint(self) -> None:
+    def log_waypoint(self) -> None:
         fix = self.last_gps
         if fix is None:
+            self.get_logger().warn("No GPS fix yet; skipping log.")
             return
 
-        # Reject impossible coordinates early
+        # Reject out-of-range coordinates
         if not (-90 <= fix.latitude <= 90 and -180 <= fix.longitude <= 180):
+            self.get_logger().warn("Received invalid GPS coordinates.")
             return
 
         # Reject out‑of‑order fixes (header time going backwards)
