@@ -263,6 +263,13 @@ Or alternatively use the `--mapviz` flag on the `gps_waypoint_follower.launch.py
 # Debugging trajectories
 To analyze the trajectories performed by the robot and determine if any issues have occured, the user can perform a recording of all topics by running `ros2 bag record --all`. Then, launch RViz2 with the provided configuration file to easily visualize the debug topics containing the waypoint coordinates, the global and local plans, the costmaps, among other things: `ros2 run rviz2 rviz2 -d /home/dev/ros_ws/src/nav2_tutorial/config/nav2_plan_viz.rviz`.
 
+
+# Dashboard
+In addition, this repository provides an interactive dashboard to control all of these processes. It can be started as follows:
+```bash
+ros2 run nav2_tutorial dashboard
+```
+
 # Recommendations
 We suggest employing tmux for controlling the robot via SSH, as intermittent disconnections may kill the running process. Next you'll find some basic steps to get familiar with tmux:
 
@@ -298,3 +305,84 @@ To reattach to the tmux session, simply use:
 tmux attach -t mysession
 ```
 You’re now back inside the process, exactly where you left off.
+
+
+# 📖 Helper Scripts Overview
+
+This project uses a set of bash scripts to manage the Docker ROS2 environment. Here’s what each script does:
+
+---
+
+### 🛠 **`build-container.sh`**
+
+* **Purpose:** Builds the Docker image using the `builder` service.
+* **What it does:**
+
+  * Stops any running containers.
+  * Rebuilds the Docker image from the Dockerfile.
+* **Usage:**
+
+  ```bash
+  bash scripts/build-container.sh
+  ```
+
+---
+
+### 🚀 **`start-container.sh`**
+
+* **Purpose:** Starts the `runner` container and optionally attaches to its shell.
+* **What it does:**
+
+  * Starts the `runner` container in detached mode (keeps `all_nodes.launch.py` running).
+  * Drops you into a shell inside the container automatically.
+* **Usage:**
+
+  ```bash
+  bash scripts/start-container.sh
+  ```
+
+  This will:
+
+  * Start `all_nodes.launch.py` (if not already running).
+  * Attach you to a shell inside the container.
+
+---
+
+### 🔄 **`restart-container.sh`**
+
+* **Purpose:** Restarts the `runner` container cleanly.
+* **What it does:**
+
+  * Stops the `runner` container.
+  * Starts it again, automatically relaunching `all_nodes.launch.py`.
+  * Attaches to a shell in the container after restart.
+* **Usage:**
+
+  ```bash
+  bash scripts/restart-container.sh
+  ```
+
+---
+
+### 📜 **`logs-container.sh`**
+
+* **Purpose:** Streams logs from the `runner` container.
+* **What it does:**
+
+  * Shows all output from `all_nodes.launch.py` and other processes in the container.
+* **Usage:**
+
+  ```bash
+  bash scripts/logs-container.sh
+  ```
+
+---
+
+## 📝 Notes
+
+* The `runner` container is designed to persist and automatically restart on system reboot.
+* To get a shell inside the container without restarting it:
+
+  ```bash
+  docker compose exec runner bash
+  ```

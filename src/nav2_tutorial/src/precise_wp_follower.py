@@ -110,9 +110,14 @@ class GpsWpCommander:
 
             if self.num_loop == 1:
                 # Fast-forward to the first pose within start_wp_tol
-                closest_idx = _closest_wp_index(robot, remaining)
-                if _pose_dist(robot, remaining[closest_idx]) > self.start_wp_tol:
-                    closest_idx = 0                    # fall back to the first wp
+                first_inside = None
+                for i, pose in enumerate(remaining):
+                    if _pose_dist(robot, pose) <= self.start_wp_tol:
+                        first_inside = i
+                        break
+
+                # Fall back to the very beginning if none are close enough
+                closest_idx = first_inside if first_inside is not None else 0
 
                 if closest_idx:
                     self._visited_wps += closest_idx   # statistics

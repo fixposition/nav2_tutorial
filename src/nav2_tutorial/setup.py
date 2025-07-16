@@ -41,6 +41,9 @@ setup(
             
             # Visualizer
             'visualize_gps = src.utils.visualize_gps:main',
+            
+            # Dashboard
+            'dashboard = src.dashboard.dashboard:main',
         ],
     },
 )

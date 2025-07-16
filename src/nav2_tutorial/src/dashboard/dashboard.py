@@ -435,6 +435,8 @@ def handle_map_click(clickData, current_mode):
         return {"lat": lat, "lon": lon}, dbc.Alert(f"Sent goal: lat={lat:.6f}, lon={lon:.6f}", color="info")
     return dash.no_update, dash.no_update
 
+def main():
+    app.run(debug=True, host="0.0.0.0", port=8055)
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8055)
+    main()

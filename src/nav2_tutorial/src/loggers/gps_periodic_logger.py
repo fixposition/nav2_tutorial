@@ -38,7 +38,7 @@ class GpsPeriodicLogger(Node):
         self.last_yaw: float = 0.0
         self.saved_points: int = 0
         self.waypoints: list[dict] = []
-        self.flush_threshold = 10
+        self.flush_threshold = 100
 
         self._DIST_TOL_M = 0.01     # Save only if robot moved more than 1 cm
         self._DEG2M_LAT = 110_574.0 # Rough conversion at mid-latitudes
