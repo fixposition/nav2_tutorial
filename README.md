@@ -72,7 +72,7 @@ converter:
 Build the ROS2 workspace.
 ```bash
 source /opt/ros/jazzy/setup.bash
-colcon build --cmake-args -DBUILD_TESTING=OFF
+colcon build --symlink-install --cmake-args -DBUILD_TESTING=OFF
 ```
 
 
@@ -93,9 +93,9 @@ sudo ip link set can0 up type can bitrate 500000
 candump can0
 ```
 
-Alternatively, the user can also directly execute the provided script start_can.sh:
+Alternatively, the user can also directly execute the provided script setup-can.sh:
 ```bash
-sudo ./scripts/start_can.sh
+sudo ./scripts/setup-can.sh
 ```
 
 Example output from the can0 port:
@@ -177,7 +177,7 @@ waypoints:
 ### Manual Logger (`gps_keylogger.py`)
 
 ```bash
-ros2 run nav2_tutorial gps_keylogger.py [optional_output.yaml]
+ros2 run nav2_tutorial gps_keylogger [optional_output.yaml]
 ```
 
 * Press `'f'` to log a waypoint
@@ -190,7 +190,7 @@ Waypoints are saved immediately and safely to disk.
 ### Periodic Logger (`gps_periodic_logger.py`)
 
 ```bash
-ros2 run nav2_tutorial gps_periodic_logger.py [optional_output.yaml] -i 0.2
+ros2 run nav2_tutorial gps_periodic_logger [optional_output.yaml] -i 0.2
 ```
 
 * Logs waypoints automatically every 0.2s (default)
@@ -209,12 +209,12 @@ nav2_tutorial/src/nav2_tutorial/trajectories/gps_waypoints_<timestamp>.yaml
 
 ## 📈 Visualizing Logged Trajectories
 
-To quickly visualize GPS waypoint logs, use the `visualize_gps_yaml.py` script:
+To quickly visualize GPS waypoint logs, use the `visualize_gps` script:
 
 ### Example:
 ```bash
-python3 utils/visualize_gps_yaml.py path/to/gps_waypoints.yaml         # simple 2D plot
-python3 utils/visualize_gps_yaml.py path/to/gps_waypoints.yaml --map   # map overlay (if supported)
+ros2 run nav2_tutorial visualize_gps path/to/gps_waypoints.yaml         # simple 2D plot
+ros2 run nav2_tutorial visualize_gps path/to/gps_waypoints.yaml --map   # map overlay (if supported)
 ```
 
 ### Requirements for Map Overlay:
@@ -235,19 +235,19 @@ ros2 launch nav2_tutorial gps_waypoint_follower.launch.py
 ```
 Note: You can use the `all_nodes.launch.py` file to achieve this. For navigation, this repository provides three waypoint following methods: Precise, Smooth, and Interactive. We can only choose one method each time we execute it.
 
-* Precise GPS Waypoint Follower
-The `precise_wp_follower` script streams all the logged points from a YAML file and makes the robot follow them point-by-point, stopping at every waypoint when the accuracy threshold is met.
-```bash
-ros2 run nav2_tutorial precise_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
-```
-
-* Smooth GPS Waypoint Follower
+* Smooth GPS Waypoint Follower (Recommended):
 The `smooth_wp_follower` script streams all the logged points from a YAML file and divides them in segments, pre-computing a smooth trajectory for the robot to follow. This ensure constant speed throughout the waypoint following task.
 ```bash
 ros2 run nav2_tutorial smooth_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
 ```
 
-* Interactive GPS Waypoint Follower
+* Precise GPS Waypoint Follower:
+The `precise_wp_follower` script streams all the logged points from a YAML file and makes the robot follow them point-by-point, stopping at every waypoint when the accuracy threshold is met. Note: Avoid combining this method with the periodic logger at high rates. Logging too frequently creates waypoints that are very close together, which can cause the robot to stop and start excessively at each point, leading to unstable behavior.
+```bash
+ros2 run nav2_tutorial precise_wp_follower <optional: /path/to/file> <optional: --last> <optional: --reverse>
+```
+
+* Interactive GPS Waypoint Follower:
 The `interactive_wp_follower` script listens to the mapviz topic for the next waypoint objective.
 ```bash
 ros2 run nav2_tutorial interactive_wp_follower
@@ -258,3 +258,131 @@ For launching the graphical interface, you can run the following command (note t
 ros2 launch nav2_tutorial mapviz.launch.py
 ```
 Or alternatively use the `--mapviz` flag on the `gps_waypoint_follower.launch.py` script.
+
+
+# Debugging trajectories
+To analyze the trajectories performed by the robot and determine if any issues have occured, the user can perform a recording of all topics by running `ros2 bag record --all`. Then, launch RViz2 with the provided configuration file to easily visualize the debug topics containing the waypoint coordinates, the global and local plans, the costmaps, among other things: `ros2 run rviz2 rviz2 -d /home/dev/ros_ws/src/nav2_tutorial/config/nav2_plan_viz.rviz`.
+
+
+# Dashboard
+In addition, this repository provides an interactive dashboard to control all of these processes. It can be started as follows:
+```bash
+ros2 run nav2_tutorial dashboard
+```
+
+# Recommendations
+We suggest employing tmux for controlling the robot via SSH, as intermittent disconnections may kill the running process. Next you'll find some basic steps to get familiar with tmux:
+
+### Installing tmux
+To install tmux on your device, please run the following commands:
+```bash
+sudo apt update && apt install tmux
+```
+
+### Start a tmux session
+After you SSH into the device (using a terminal or VSCode's Remote-SSH), start a new tmux session as:
+```bash
+tmux new -s mysession
+```
+where "mysession" is simply the name given to this tmux session. Note that the prompt will change slightly once inside the tmux session. Inside, you can interact with it as a normal terminal and run any process.
+
+### Detach from tmux
+At any point, the user can "detach" from tmux and the process will keep running in the background. To do this, please press: 'Ctrl + b' (release both) then press 'd'. This detaches from the session and brings you back to the normal shell while the program continues running.
+
+### Reconnect later
+If the SSH connection drops or you log in again later, list running tmux sessions as:
+```bash
+tmux ls
+```
+
+The user will be prompted with something like:
+```bash
+mysession: 1 windows (created Thu Jul  3 14:32:51 2025) [80x24]
+```
+
+To reattach to the tmux session, simply use:
+```bash
+tmux attach -t mysession
+```
+You’re now back inside the process, exactly where you left off.
+
+
+# 📖 Helper Scripts Overview
+
+This project uses a set of bash scripts to manage the Docker ROS2 environment. Here’s what each script does:
+
+---
+
+### 🛠 **`build-container.sh`**
+
+* **Purpose:** Builds the Docker image using the `builder` service.
+* **What it does:**
+
+  * Stops any running containers.
+  * Rebuilds the Docker image from the Dockerfile.
+* **Usage:**
+
+  ```bash
+  bash scripts/build-container.sh
+  ```
+
+---
+
+### 🚀 **`start-container.sh`**
+
+* **Purpose:** Starts the `runner` container and optionally attaches to its shell.
+* **What it does:**
+
+  * Starts the `runner` container in detached mode (keeps `all_nodes.launch.py` running).
+  * Drops you into a shell inside the container automatically.
+* **Usage:**
+
+  ```bash
+  bash scripts/start-container.sh
+  ```
+
+  This will:
+
+  * Start `all_nodes.launch.py` (if not already running).
+  * Attach you to a shell inside the container.
+
+---
+
+### 🔄 **`restart-container.sh`**
+
+* **Purpose:** Restarts the `runner` container cleanly.
+* **What it does:**
+
+  * Stops the `runner` container.
+  * Starts it again, automatically relaunching `all_nodes.launch.py`.
+  * Attaches to a shell in the container after restart.
+* **Usage:**
+
+  ```bash
+  bash scripts/restart-container.sh
+  ```
+
+---
+
+### 📜 **`logs-container.sh`**
+
+* **Purpose:** Streams logs from the `runner` container.
+* **What it does:**
+
+  * Shows all output from `all_nodes.launch.py` and other processes in the container.
+* **Usage:**
+
+  ```bash
+  bash scripts/logs-container.sh
+  ```
+
+---
+
+## 📝 Notes
+
+* The `runner` container is designed to persist and automatically restart on system reboot.
+* To get a shell inside the container without restarting it:
+
+  ```bash
+  docker compose exec runner bash
+  ```

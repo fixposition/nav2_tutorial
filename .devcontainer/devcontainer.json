@@ -9,7 +9,7 @@
     "ms-toolsai.jupyter"
   ],
   "settings": {
-    "python.pythonPath": "/usr/bin/python3"
+    "python.pythonPath": "/home/dev/nav2_env/bin/python"
   },
   "remoteUser": "dev",
   "updateRemoteUserUID": false
