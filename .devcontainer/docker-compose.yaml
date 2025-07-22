@@ -39,7 +39,7 @@ services:
 
   vrtk:
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile
       args:
         USER_NAME: "dev"
